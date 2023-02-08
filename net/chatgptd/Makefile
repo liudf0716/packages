@@ -16,7 +16,6 @@ PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=COPYING
 
 include $(INCLUDE_DIR)/package.mk
-include $(INCLUDE_DIR)/cmake.mk
 
 define Package/chatgptd
   SUBMENU:=Web Servers/Proxies
@@ -31,13 +30,16 @@ define Package/chatgptd/description
   to permit access to the chatgpt service.
 endef
 
+define Build/Compile
+endef
+
 define Package/chatgptd/conffiles
 /etc/config/chatgptd
 endef
 
 define Package/chatgptd/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) $(1)/usr/bin/chatgptd $(1)/usr/bin/chatgptd
+	$(INSTALL_BIN) ./files/chatgptd $(1)/usr/bin/chatgptd
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/chatgptd.init $(1)/etc/init.d/chatgptd
 	$(INSTALL_DIR) $(1)/etc/config
