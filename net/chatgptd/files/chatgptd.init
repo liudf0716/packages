@@ -12,10 +12,10 @@ CONF="chatgptd"
 PROG="/usr/bin/chatgptd"
 
 start_service() {
-    config load "$CONF"
+    config_load "$CONF"
 
 	local enabled
-	config_get_bool enabled "config" "enabled"
+	config_get_bool enabled "config" "enabled" "0"
 	[ "$enabled" -eq "1" ] || return 1
 
 	procd_open_instance
