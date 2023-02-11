@@ -39,7 +39,11 @@ endef
 
 define Package/chatgptd/install
 	$(INSTALL_DIR) $(1)/usr/bin
-	$(INSTALL_BIN) ./files/chatgptd $(1)/usr/bin/chatgptd
+ifeq ($(ARCH),arm)
+	$(INSTALL_BIN) ./files/chatgptd_linux_arm7 $(1)/usr/bin/chatgptd
+else
+	$(INSTALL_BIN) ./files/chatgptd_linux_amd64 $(1)/usr/bin/chatgptd
+endif
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/chatgptd.init $(1)/etc/init.d/chatgptd
 	$(INSTALL_DIR) $(1)/etc/config
