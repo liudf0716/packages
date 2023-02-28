@@ -21,7 +21,7 @@ mk_ss_redir_conf() {
         'server:host:127.0.0.1' \
         'server_port:port:12948' \
         'password:string' \
-        "method:or($stream_methods, $aead_methods)" \
+        "encrypt:or($stream_methods, $aead_methods)" \
         'local_address:host:0.0.0.0' \
         'local_port:port:1088' \
         'fast_open:bool:1' \
@@ -35,7 +35,7 @@ mk_ss_redir_conf() {
     json_init
     json_add_string server $server
     json_add_int server_port $server_port
-    json_add_string method $method
+    json_add_string method $encrypt
     json_add_string password $password
     json_add_string local_address $local_address
     json_add_int local_port $local_port
