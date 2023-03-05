@@ -53,7 +53,11 @@ parse_smartdns_gfw_conf() {
         echo "no smartdns_gfw_domain.conf"
         return
     fi
-   
+	
+	if [ -f /etc/smartdns/smartdns_gfw_nftset.conf ]; then
+		rm -f /etc/smartdns/smartdns_gfw_nftset.conf
+	fi
+
     for nameserver in $(cat /etc/smartdns/smartdns_gfw_domain.conf | grep nameserver | awk '{print $2}'); do
         domain_name=$(echo $nameserver | awk -F '/' '{print $2}')
         nftset_rule=$(echo "nftset /$domain_name/#4:inet#fw4#ss-redir_set,#6:inet#fw4#ss-redir_set6")
