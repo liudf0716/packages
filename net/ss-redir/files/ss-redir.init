@@ -88,6 +88,7 @@ start_service() {
     config_get_bool enabled "server" "enabled" "0"
     [ "$enabled" -eq "1" ] || {
         echo "service does not enabled"
+		clear_ss_redir_rule
         return 1
     }
 
