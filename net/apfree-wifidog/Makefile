@@ -14,7 +14,7 @@ PKG_RELEASE:=6
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/liudf0716/apfree-wifidog.git
 PKG_SOURCE_VERSION:=$(PKG_VERSION)
-PKG_MIRROR_HASH:=2db0fedbc69e3fef62118dbde84265cc672dbba544c7aae3cd2fb5a895f7ec7a
+PKG_MIRROR_HASH:=55ec1e7366ab6900e4dfe5c088ad6a3b2d58b9878a6b329f2efb1faaac16b704
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
