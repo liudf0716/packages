@@ -1,0 +1,4 @@
+#!/bin/sh
+
+/etc/init.d/chatgptd enabled && /etc/init.d/chatgptd restart
+exit 0

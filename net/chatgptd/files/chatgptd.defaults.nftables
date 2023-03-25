@@ -1,0 +1,11 @@
+#!/bin/sh
+
+uci -q batch <<-EOT
+	delete firewall.chatgptd
+	set firewall.chatgptd=include
+	set firewall.chatgptd.type=script
+	set firewall.chatgptd.path=/usr/share/chatgptd/firewall.include
+	commit firewall
+EOT
+
+exit 0

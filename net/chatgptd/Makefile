@@ -48,6 +48,10 @@ endif
 	$(INSTALL_BIN) ./files/chatgptd.init $(1)/etc/init.d/chatgptd
 	$(INSTALL_DIR) $(1)/etc/config
 	$(CP) ./files/chatgptd.conf $(1)/etc/config/chatgptd
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_DIR) $(1)/usr/share/chatgptd
+	$(INSTALL_DATA) ./files/firewall4.include $(1)/usr/share/chatgptd/firewall.include
+	$(INSTALL_BIN) ./files/chatgptd.defaults.nftables $(1)/etc/uci-defaults/99-chatgptd	
 endef
 
 $(eval $(call BuildPackage,chatgptd))
