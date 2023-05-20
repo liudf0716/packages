@@ -17,10 +17,7 @@ start_service() {
 	local enabled
 	config_get_bool enabled "config" "enabled" "0"
 	[ "$enabled" -eq "1" ] || {
-<<<<<<< HEAD
-=======
 		echo "chatgptd is disabled"
->>>>>>> e1ba838c2 (chatgpt： when chatgptd disable clean its rule)
 		$PROG --clean
 		return 1
 	}
