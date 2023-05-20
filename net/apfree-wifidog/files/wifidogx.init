@@ -64,8 +64,8 @@ init_config() {
 start_service() {
 	config_load $NAME
 
-	config_get_bool disabled common "disabled" 1
-	[ "$disabled" -eq 1 ] && {
+	config_get_bool enabled common "enabled" 0
+	[ "$enabled" -eq 0 ] && {
 		echo "wifidogx is disabled, exit..." >&2
 		exit 0
 	}
