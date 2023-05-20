@@ -33,18 +33,18 @@ define Build/Compile
 endef
 
 define Package/ss-redir/conffiles
-/etc/config/ss-redir
+  /etc/config/ss-redir
 endef
 
 define Package/ss-redir/install
-  $(INSTALL_DIR) $(1)/etc/init.d
-  $(INSTALL_DIR) $(1)/etc/uci-defaults
-  $(INSTALL_DIR) $(1)/usr/share/ss-redir
-  $(INSTALL_DIR) $(1)/etc/config
-  $(INSTALL_BIN) ./files/ss-redir.init $(1)/etc/init.d/ss-redir
-  $(INSTALL_BIN) ./files/ss-redir.conf $(1)/etc/config/ss-redir
-  $(INSTALL_DATA) ./files/firewall4.include $(1)/usr/share/ss-redir/firewall.include
-  $(INSTALL_BIN) ./files/ss-redir.defaults.nftables $(1)/etc/uci-defaults/99-ss-redir
+	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_DIR) $(1)/usr/share/ss-redir
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_BIN) ./files/ss-redir.init $(1)/etc/init.d/ss-redir
+	$(INSTALL_BIN) ./files/ss-redir.conf $(1)/etc/config/ss-redir
+	$(INSTALL_DATA) ./files/firewall4.include $(1)/usr/share/ss-redir/firewall.include
+	$(INSTALL_BIN) ./files/ss-redir.defaults.nftables $(1)/etc/uci-defaults/99-ss-redir
 endef
 
 $(eval $(call BuildPackage,ss-redir))
