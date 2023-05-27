@@ -21,6 +21,7 @@ prepare_wifidog_conf() {
 	network_get_device external_interface wan
 
 	uci_validate_section ${NAME} ${NAME} common \
+		'enabled:bool:0' \
 		'gateway_id:string' \
 		'gateway_interface:string:br-lan' \
 		'external_interface:string:external_interface' \
@@ -71,13 +72,12 @@ init_config() {
 start_service() {
 	config_load $NAME
 
-	config_get_bool enabled common "enabled" 0
+	init_config
+
 	[ "$enabled" -eq 0 ] && {
 		echo "wifidogx is disabled, exit..." >&2
 		exit 0
 	}
-
-	init_config
 
 	procd_open_instance
 	# -f: run in foreground
