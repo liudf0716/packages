@@ -50,6 +50,8 @@ endif
 	$(CP) ./files/alist.conf $(1)/etc/config/alist
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/block
 	$(INSTALL_BIN) ./files/10-mount $(1)/etc/hotplug.d/block/10-mount
+	$(INSTALL_DIR) $(1)/etc/alist
+	$(CP) ./files/data.db $(1)/etc/alist/data.db
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))
