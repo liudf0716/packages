@@ -20,7 +20,7 @@ handle_xfrpc() {
 
 	handle_type() {
 		uci_validate_section xfrpc xfrpc "$name" \
-				'type:or("tcp", "http", "https")' \
+				'type:or("tcp", "http", "https", "mstsc", "socks5")' \
 				'local_ip:ipaddr:127.0.0.1' \
 				'local_port:uinteger'
 
