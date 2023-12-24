@@ -24,7 +24,6 @@ prepare_wifidog_conf() {
 		'enabled:bool:0' \
 		'gateway_id:string' \
 		'gateway_interface:string:br-lan' \
-		'external_interface:string:external_interface' \
 		'auth_server_hostname:string' \
 		'auth_server_port:port:443' \
 		'auth_server_path:string:/wifidog/' \
