@@ -565,6 +565,8 @@ config_remote() {
 		;;
 	esac
 
+	[ -n "$send_cert" ] && swanctl_xappend2 "send_cert = $send_cert"
+
 	[ $mobike -eq 1 ] && swanctl_xappend2 "mobike = yes" || swanctl_xappend2 "mobike = no"
 
 	if [ -n "$rekeytime" ]; then
