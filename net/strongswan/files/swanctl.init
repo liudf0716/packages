@@ -699,6 +699,10 @@ prepare_env() {
 	config_load ipsec
 	config_foreach config_ipsec ipsec
 	config_foreach config_remote remote
+	
+	swanctl_xappend0 "pools {"
+	config_foreach config_pool pools
+	swanctl_xappend0 "}"
 
 	do_postamble
 }
