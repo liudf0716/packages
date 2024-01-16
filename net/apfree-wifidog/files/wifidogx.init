@@ -18,8 +18,6 @@ prepare_wifidog_conf() {
 
 	[ -f ${CONFIGFILE} ] && rm -f ${CONFIGFILE}
 
-	network_get_device external_interface wan
-
 	uci_validate_section ${NAME} ${NAME} common \
 		'enabled:bool:0' \
 		'gateway_id:string' \
@@ -32,20 +30,29 @@ prepare_wifidog_conf() {
 		'js_filter:bool:1' \
 		'wired_passed:bool:1' \
 		'apple_cna:bool:0' \
+		'channel_path:string:apfree' \
 		'js_filter:bool:1' 
 
 	# if gateway_id is not set, get it from br-lan
 	if [ -z "$gateway_id" ]; then
 		gateway_id=$(sed -e 's/://g' /sys/class/net/${gateway_interface}/address)
+		# convert to upper case
+		gateway_id=$(echo $gateway_id | tr '[a-z]' '[A-Z]')
 		# uci add gateway_id to config file
 		uci set ${NAME}.common.gateway_id=$gateway_id
 		uci commit ${NAME}
 	fi
 	
+	# if channel_path is not set, set it to apfree
+	if [ -z "$channel_path" ]; then
+		channel_path=apfree
+		uci set ${NAME}.common.channel_path=$channel_path
+		uci commit ${NAME}
+	fi
+
 	# set above variables to config file
 	echo "GatewayID $gateway_id" > ${CONFIGFILE}
 	echo "GatewayInterface $gateway_interface" >> ${CONFIGFILE}
-	echo "ExternalInterface $external_interface" >> ${CONFIGFILE}
 	echo "AuthServer {
 	Hostname $auth_server_hostname
 	HTTPPort $auth_server_port
