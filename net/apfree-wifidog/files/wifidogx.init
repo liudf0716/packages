@@ -8,10 +8,6 @@ NAME=wifidogx
 PROG=/usr/bin/${NAME}
 CONFIGFILE=/tmp/wifidogx.conf
 
-service_trigger() {
-	procd_add_reload_trigger ${NAME}
-}
-
 prepare_wifidog_conf() {
 
 	[ -f ${CONFIGFILE} ] && rm -f ${CONFIGFILE}
@@ -62,31 +58,21 @@ prepare_wifidog_conf() {
 	echo "BypassAppleCNA $apple_cna" >> ${CONFIGFILE}
 }
 
-init_config() {
-
-	prepare_wifidog_conf 
-
-	if [ ! -f ${CONFIGFILE} ]; then
-		echo "no wifidogx.conf, exit..." >&2
-		exit
-	fi
-}
-
 start_service() {
 	config_load $NAME
 
-	init_config
+	prepare_wifidog_conf
 
 	[ "$enabled" -eq 0 ] && {
 		echo "wifidogx is disabled, exit..." >&2
-		exit 0
+		return
 	}
 
 	procd_open_instance
 	# -f: run in foreground
 	procd_set_param command $PROG -c $CONFIGFILE -f -d 0
 	procd_set_param respawn # respawn automatically if something died
-	procd_set_param file $CONFIGFILE
+	procd_set_param file /etc/config/wifidogx
 	procd_close_instance
 }
 
@@ -97,4 +83,8 @@ status_service() {
 reload_service() {
 	stop 
 	start
+}
+
+service_triggers() {
+	procd_add_reload_trigger "${NAME}"
 }
