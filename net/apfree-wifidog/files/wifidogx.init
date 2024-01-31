@@ -25,6 +25,7 @@ prepare_wifidog_conf() {
 		'apple_cna:bool:0' \
 		'channel_path:string' \
 		'trusted_domains:string' \
+		'trusted_macs:string' \
 		'js_filter:bool:1' 
 
 	# if gateway_id is not set, get it from br-lan
@@ -60,6 +61,10 @@ prepare_wifidog_conf() {
 	# if has trusted_domains, add it to config file
 	if [ ! -z "$trusted_domains" ]; then
 		echo "TrustedDomains $trusted_domains" >> ${CONFIGFILE}
+	fi
+	# if has trusted_macs, add it to config file
+	if [ ! -z "$trusted_macs" ]; then
+		echo "TrustedMACList $trusted_macs" >> ${CONFIGFILE}
 	fi
 }
 
