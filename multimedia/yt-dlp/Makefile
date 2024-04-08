@@ -1,11 +1,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=yt-dlp
-PKG_VERSION:=2023.1.6
+PKG_VERSION:=2023.12.30
 PKG_RELEASE:=1
 
 PYPI_NAME:=yt-dlp
-PKG_HASH:=3a783a36751ced16368f40b3ba865ab39b30689ed8056f1ee2346aa3839a0b0f
+PKG_HASH:=a11862e57721b0a0f0883dfeb5a4d79ba213a2d4c45e1880e9fd70f8e6570c38
 
 PKG_MAINTAINER:=Michal Vasilek <michal.vasilek@nic.cz>
 PKG_LICENSE:=Unlicense
@@ -27,9 +27,11 @@ define Package/yt-dlp
     +python3-codecs \
     +python3-ctypes \
     +python3-email \
+    +python3-logging \
     +python3-openssl \
     +python3-sqlite3 \
     +python3-urllib \
+    +python3-uuid \
     +python3-xml
 endef
 
