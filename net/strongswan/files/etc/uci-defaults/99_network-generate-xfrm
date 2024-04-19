@@ -1,0 +1,13 @@
+[ "$(uci -q get network.xfrm0)" == "interface" ] && exit 0
+
+# Create the xfrm0 interface
+uci -q batch <<-EOF
+    set network.xfrm0=interface
+    set network.xfrm0.proto=xfrm
+    set network.xfrm0.ifid='301'
+    set network.xfrm0.tunlink='lan'
+    set network.xfrm0.mtu='1300'
+	set network.xfrm0.zone='lan'
+EOF
+
+exit 0
