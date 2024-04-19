@@ -587,6 +587,8 @@ define Package/strongswan-swanctl/install
 	$(INSTALL_BIN) ./files/swanctl.init $(1)/etc/init.d/swanctl
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/ipsec.config $(1)/etc/config/ipsec
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/99_network-generate-xfrm $(1)/etc/uci-defaults/
 endef
 
 define Package/strongswan-gencerts/install
