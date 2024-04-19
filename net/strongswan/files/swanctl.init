@@ -466,8 +466,10 @@ config_remote() {
 	config_get ca_cert "$conf" ca_cert ""
 	config_get rekeytime "$conf" rekeytime
 	config_get overtime "$conf" overtime
+	config_get send_cert "$conf" send_cert
+	config_get eap_id "$conf" eap_id "%any"
+	config_get local_sourceip "$conf" local_sourceip "0.0.0.0"
 
-	config_list_foreach "$conf" local_sourceip append_var local_sourceip ","
 	config_list_foreach "$conf" remote_ca_certs append_var remote_ca_certs ","
 	config_list_foreach "$conf" pools append_var pools ","
 
