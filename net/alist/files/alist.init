@@ -1,81 +1,113 @@
 #!/bin/sh /etc/rc.common
 
-START=99
 USE_PROCD=1
-PROG=/usr/bin/alist
-CONFIG_DIR=/etc/alist
+START=99
 
-get_config() {
-	config_get_bool enabled $1 enabled 1
-	config_get port $1 port 5244
-	config_get log $1 log 1
-	config_get temp_dir $1 temp_dir "/tmp/alist"
-	config_get ssl $1 ssl 0
-	config_get ssl_cert $1 ssl_cert ""
-	config_get ssl_key $1 ssl_key ""
-	config_get token_expires_in $1 token_expires_in 48
-	config_get allow_wan $1 allow_wan 0
-	config_load network
-	config_get lan_addr lan ipaddr "0.0.0.0"
+CONF="alist"
+PROG="/usr/bin/alist"
+CONF_DIR="/etc/$CONF"
+RUN_DIR="/var/run/$CONF"
+
+uci_json_add_boolean() {
+	local enabled
+	config_get_bool enabled "${4:-config}" "$2" "${3:-0}"
+	json_add_boolean "$1" "$enabled"
 }
 
-set_firewall() {
-	if [ "$external_access" = "allow" ]; then
-		uci -q delete firewall.alist
-		uci set firewall.alist=rule
-		uci set firewall.alist.name="alist"
-		uci set firewall.alist.target="ACCEPT"
-		uci set firewall.alist.src="wan"
-		uci set firewall.alist.proto="tcp"
-		uci set firewall.alist.dest_port="$port"
-		uci set firewall.alist.enabled="1"
-		uci commit firewall
-		/etc/init.d/firewall reload >/dev/null 2>&1
-	elif [ "$external_access" = "deny" ]; then
-		uci -q delete firewall.alist
-		uci commit firewall
-		/etc/init.d/firewall reload >/dev/null 2>&1
-	fi
+uci_json_add_int() {
+	local value
+	config_get value "${4:-config}" "$2" "${3:-0}"
+	json_add_int "$1" "$value"
+}
+
+uci_json_add_string() {
+	local value
+	config_get value "${4:-config}" "$2" $3
+	json_add_string "$1" "$value"
 }
 
 start_service() {
-	config_load alist
-	config_foreach get_config alist
-	[ $enabled != 1 ] && return 1
-	mkdir -p $temp_dir
-	[ "$ssl" -eq 1 ] && SSL=true || SSL=false
-	[ "$log" -eq 1 ] && LOG=true || LOG=false
-	if [ "$allow_wan" -eq "1" ]; then
-		listen_addr="0.0.0.0"
-		external_access="allow"
-	else
-		listen_addr=$lan_addr
-		external_access="deny"
-	fi
-	set_firewall
-	cat /dev/null > $temp_dir/alist.log
-	cat > $CONFIG_DIR/config.json <<EOF
-{"force":false,"address":"$listen_addr","port":$port,"cdn":"","jwt_secret":"","token_expires_in":$token_expires_in,"database":{"type":"sqlite3","host":"","port":0,"user":"","password":"","name":"","db_file":"/etc/alist/data.db","table_prefix":"x_","ssl_mode":""},"scheme":{"https":$SSL,"cert_file":"$ssl_cert","key_file":"$ssl_key"},"temp_dir":"$temp_dir","log":{"enable":$LOG,"name":"$temp_dir/alist.log","max_size":10,"max_backups":5,"max_age":28,"compress":false}}
-EOF
-	procd_open_instance alist
-	procd_set_param command $PROG
-	procd_append_param command server --data $CONFIG_DIR
-	procd_set_param stdout 1
-	procd_set_param stderr 1
-	procd_set_param respawn
-	procd_close_instance alist
-}
+	config_load "$CONF"
 
-service_triggers() {
-	procd_add_reload_trigger "alist"
+	local enabled
+	config_get_bool enabled "config" "enabled" "0"
+	[ "$enabled" -eq "1" ] || return 1
+
+	local jwt_secret
+	jwt_secret="$(jsonfilter -qi "$CONF_DIR/config.json" -e "@.jwt_secret")"
+	[ -n "$jwt_secret" ] || jwt_secret="$(tr -cd "a-zA-Z0-9" < "/dev/urandom" | head -c16)"
+
+	mkdir -p "$CONF_DIR"
+	mkdir -p "$RUN_DIR"
+
+	json_init
+	json_add_boolean "force" "1"
+	uci_json_add_string "site_url" "site_url"
+	uci_json_add_string "cdn" "site_cdn"
+	json_add_string "jwt_secret" "$jwt_secret"
+	uci_json_add_int "token_expires_in" "site_login_expire" "48"
+	json_add_object "database"
+		uci_json_add_string "type" "db_type" "sqlite3"
+		uci_json_add_string "host" "db_host"
+		uci_json_add_int "port" "db_port"
+		uci_json_add_string "user" "db_user"
+		uci_json_add_string "password" "db_pass"
+		uci_json_add_string "name" "db_name"
+		json_add_string "db_file" "$CONF_DIR/data.db"
+		uci_json_add_string "table_prefix" "db_table_prefix" "x_"
+		uci_json_add_string "ssl_mode" "db_ssl_mode"
+	json_close_object
+	json_add_object "scheme"
+		uci_json_add_string "address" "listen_addr" "0.0.0.0"
+		uci_json_add_int "http_port" "listen_http_port" "5244"
+		uci_json_add_int "https_port" "listen_https_port" "-1"
+		uci_json_add_boolean "force_https" "listen_force_https"
+		uci_json_add_string "cert_file" "listen_cert_file"
+		uci_json_add_string "key_file" "listen_key_file"
+		uci_json_add_string "unix_file" "listen_unix_file"
+		uci_json_add_string "unix_file_perm" "listen_unix_file_perm"
+	json_close_object
+	json_add_string "temp_dir" "$RUN_DIR/temp"
+	json_add_string "bleve_dir" "$CONF_DIR/bleve"
+	json_add_object "log"
+		uci_json_add_boolean "enable" "log_enable" "1"
+		json_add_string "name" "$RUN_DIR/log/alist.log"
+		uci_json_add_int "max_size" "log_max_size" "5"
+		uci_json_add_int "max_backups" "log_max_backups" "1"
+		uci_json_add_int "max_age" "log_max_age" "15"
+		json_add_boolean "compress" "0"
+	json_close_object
+	json_add_int "delayed_start" "0"
+	uci_json_add_int "max_connections" "site_max_connections"
+	uci_json_add_boolean "tls_insecure_skip_verify" "site_tls_insecure"
+	json_dump > "$CONF_DIR/config.json"
+
+	local db_type
+	config_get db_type "config" "db_type" "sqlite3"
+	[ "$db_type" != "sqlite3" -o -e "$CONF_DIR/data.db" ] || "$PROG" --data "$CONF_DIR" admin set "password" 2>"/dev/null"
+
+	procd_open_instance
+	procd_set_param command "$PROG"
+	procd_append_param command server
+	procd_append_param command --data "$CONF_DIR"
+	procd_append_param command --no-prefix
+
+	local debug
+	config_get_bool debug "config" "debug" "0"
+	[ "$debug" -eq "0" ] || procd_append_param command --debug
+
+	procd_set_param limits core="unlimited"
+	procd_set_param limits nofile="1000000 1000000"
+	procd_set_param respawn
+	[ "$debug" -eq "0" ] || procd_set_param stderr 1
+
+	procd_close_instance
 }
 
 stop_service() {
-	external_access="deny"
-	set_firewall
+	rm -rf "$RUN_DIR"
 }
 
-reload_service() {
-	stop
-	start
+service_triggers() {
+	procd_add_reload_trigger "$CONF"
 }
