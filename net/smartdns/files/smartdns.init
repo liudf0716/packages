@@ -107,7 +107,15 @@ stop_forward_dnsmasq()
 set_main_dns()
 {
 	local hostip
-	hostip="$(uci -q get network.lan.ipaddr)"
+	local protocol
+	local dnsmasq_port
+	protocol="$(uci -q get network.lan.proto)"
+	[ "$protocol" = "static" ] && {
+		hostip="$(uci -q get network.lan.ipaddr)"
+	} || {
+		hostip="$(ifconfig | grep "inet addr" | grep -v ":127" | grep "Bcast" | awk '{print $2}' | awk -F : '{print $2}')"
+	}
+	
 	dnsmasq_port="$(uci -q get dhcp.@dnsmasq[0].port)"
 	[ -z "$dnsmasq_port" ] && dnsmasq_port="53"
 	
