@@ -2,11 +2,10 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=kcptun
 PKG_VERSION:=20230207
-PKG_RELEASE:=$(AUTORELEASE)
+PKG_RELEASE:=1
 
-PKG_SOURCE:=v$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://github.com/xtaci/kcptun/archive/refs/tags/
-PKG_SOURCE_DATE:=2023-02-07
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/xtaci/kcptun/tar.gz/v${PKG_VERSION}?
 PKG_HASH:=09054b52d5799a8e47edb36f2db335d929d5bbb63a26f7ba2fe03c64ec39d550
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>, Chao Liu <expiron18@gmail.com>
@@ -15,7 +14,7 @@ PKG_LICENSE_FILES:=LICENSE.md
 
 PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_PARALLEL:=1
-PKG_USE_MIPS16:=0
+PKG_BUILD_FLAGS:=no-mips16
 
 GO_PKG:=github.com/xtaci/kcptun
 
