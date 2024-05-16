@@ -24,8 +24,8 @@ prepare_wifidog_conf() {
 		'wired_passed:bool:1' \
 		'apple_cna:bool:0' \
 		'channel_path:string' \
-		'trusted_domains:string' \
-		'trusted_macs:string' \
+		'trusted_domains:list(host)' \
+		'trusted_macs:list(string)' \
 		'js_filter:bool:1' 
 
 	# if gateway_id is not set, get it from br-lan
@@ -58,12 +58,14 @@ prepare_wifidog_conf() {
 	echo "JsFilter $js_filter" >> ${CONFIGFILE}
 	echo "WiredPassed $wired_passed" >> ${CONFIGFILE}
 	echo "BypassAppleCNA $apple_cna" >> ${CONFIGFILE}
-	# if has trusted_domains, add it to config file
+	# if has trusted_domains, parse the list to a string with ',' as separator and add it to config file
 	if [ ! -z "$trusted_domains" ]; then
+		trusted_domains=$(echo $trusted_domains | tr ' ' ',')
 		echo "TrustedDomains $trusted_domains" >> ${CONFIGFILE}
 	fi
 	# if has trusted_macs, add it to config file
 	if [ ! -z "$trusted_macs" ]; then
+		trusted_macs=$(echo $trusted_macs | tr ' ' ',')
 		echo "TrustedMACList $trusted_macs" >> ${CONFIGFILE}
 	fi
 }
