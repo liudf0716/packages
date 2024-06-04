@@ -14,6 +14,7 @@ prepare_wifidog_conf() {
 
 	uci_validate_section ${NAME} ${NAME} common \
 		'enabled:bool:0' \
+		'log_level:integer:7' \
 		'gateway_id:string' \
 		'gateway_interface:string:br-lan' \
 		'auth_server_hostname:string' \
@@ -82,7 +83,7 @@ start_service() {
 
 	procd_open_instance
 	# -f: run in foreground
-	procd_set_param command $PROG -c $CONFIGFILE -f -d 0
+	procd_set_param command $PROG -c $CONFIGFILE -s -f -d $log_level
 	procd_set_param respawn # respawn automatically if something died
 	procd_set_param file /etc/config/wifidogx
 	procd_close_instance
