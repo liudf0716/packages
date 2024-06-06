@@ -27,6 +27,8 @@ prepare_wifidog_conf() {
 		'channel_path:string' \
 		'trusted_domains:list(host)' \
 		'trusted_macs:list(string)' \
+		'app_white_list:list(string)' \
+		'mac_white_list:list(string)' \
 		'js_filter:bool:1' 
 
 	# if gateway_id is not set, get it from br-lan
@@ -44,6 +46,28 @@ prepare_wifidog_conf() {
 		channel_path=apfree
 		uci set ${NAME}.common.channel_path=$channel_path
 		uci commit ${NAME}
+	fi
+
+	if [ ! -z "$app_white_list" ]; then
+		# iterate app_white_list and find the corresponding domain according to the item
+		for group in $app_white_list; do
+			group_domain_list=$(uci get wifidogx.$group.domain_name)
+			# if the domain list is not empty, add it to trusted_domains
+			if [ ! -z "$group_domain_list" ]; then
+				trusted_domains="$trusted_domains $group_domain_list"
+			fi
+		done
+	fi
+
+	if [ ! -z "$mac_white_list" ]; then
+		# iterate mac_white_list and find the corresponding mac according to the item
+		for group in $mac_white_list; do
+			group_mac_list=$(uci get wifidogx.$group.mac_address)
+			# if the mac list is not empty, add it to trusted_macs
+			if [ ! -z "$group_mac_list" ]; then
+				trusted_macs="$trusted_macs $group_mac_list"
+			fi
+		done
 	fi
 
 	# set above variables to config file
