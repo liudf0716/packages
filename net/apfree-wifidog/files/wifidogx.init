@@ -29,6 +29,8 @@ prepare_wifidog_conf() {
 		'trusted_macs:list(string)' \
 		'app_white_list:list(string)' \
 		'mac_white_list:list(string)' \
+		'enable_dns_forward:bool:1' \
+		'enable_websocket:bool:1' \
 		'js_filter:bool:1' 
 
 	# if gateway_id is not set, get it from br-lan
@@ -83,6 +85,8 @@ prepare_wifidog_conf() {
 	echo "JsFilter $js_filter" >> ${CONFIGFILE}
 	echo "WiredPassed $wired_passed" >> ${CONFIGFILE}
 	echo "BypassAppleCNA $apple_cna" >> ${CONFIGFILE}
+	echo "EnableDNSForward $enable_dns_forward" >> ${CONFIGFILE}
+	echo "EnableWS $enable_websocket" >> ${CONFIGFILE}
 	# if has trusted_domains, parse the list to a string with ',' as separator and add it to config file
 	if [ ! -z "$trusted_domains" ]; then
 		trusted_domains=$(echo $trusted_domains | tr ' ' ',')
