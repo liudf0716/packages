@@ -51,11 +51,13 @@ endef
 define Package/smartdns/install
 	$(INSTALL_DIR) $(1)/usr/sbin $(1)/etc/config $(1)/etc/init.d 
 	$(INSTALL_DIR) $(1)/etc/smartdns $(1)/etc/smartdns/domain-set $(1)/etc/smartdns/conf.d/
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/smartdns $(1)/usr/sbin/smartdns
 	$(INSTALL_BIN) ./files/smartdns.init $(1)/etc/init.d/smartdns
 	$(INSTALL_CONF) ./files/smartdns.conf $(1)/etc/config/smartdns
 	$(INSTALL_CONF) ./files/smartdns_gfw_domain.conf $(1)/etc/smartdns/smartdns_gfw_domain.conf
 	$(INSTALL_CONF) ./files/custom.conf $(1)/etc/smartdns/custom.conf
+	$(INSTALL_CONF) ./files/60-smartdns $(1)/etc/hotplug.d/iface/60-smartdns
 endef
 
 $(eval $(call BuildPackage,smartdns))

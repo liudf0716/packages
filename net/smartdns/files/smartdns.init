@@ -119,10 +119,12 @@ set_main_dns()
 	dnsmasq_port="$(uci -q get dhcp.@dnsmasq[0].port)"
 	[ -z "$dnsmasq_port" ] && dnsmasq_port="53"
 	
-	[ -z "$hostip" ] && return
+	[ -z "$hostip" ] || {
+		uci -q del_list dhcp.lan.dhcp_option="6,$hostip"
+		uci -q add_list dhcp.lan.dhcp_option="6,$hostip"
+	}
 	[ "$dnsmasq_port" = "53" ] && {
 		uci -q set dhcp.@dnsmasq[0].port=0
-		uci -q add_list dhcp.lan.dhcp_option="6,$hostip"
 	}
 
 	# for some third-party firmware
@@ -682,10 +684,6 @@ load_service()
 
 	config_foreach load_domain_rule_list "domain-rule-list"
 
-	update_smartdns_gfw_conf
-
-	parse_smartdns_gfw_conf
-
 	{
 		echo "conf-file $CUSTOM_CONF"
 		echo "conf-file $GFW_CONF"
@@ -782,6 +780,10 @@ check_and_add_entry() {
 	if [ ! -d "$SMARTDNS_CONF_DOWNLOAD_DIR" ]; then
 		mkdir -p "$SMARTDNS_CONF_DOWNLOAD_DIR"
 	fi
+
+	update_smartdns_gfw_conf
+
+	parse_smartdns_gfw_conf
 }
 
 updatefiles() {
