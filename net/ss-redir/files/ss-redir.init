@@ -59,7 +59,10 @@ add_ss_redir_rule() {
     nft add rule inet fw4 ss-redir_chain ip saddr @all_proxy_set meta l4proto tcp redirect to 1080
     nft add rule inet fw4 ss-redir_chain ip6 saddr @all_proxy_set6 meta l4proto tcp redirect to 1080
     nft add rule inet fw4 ss-redir_chain ip daddr @ss-redir_set meta l4proto tcp redirect to 1088
+    nft add rule inet fw4 ss-redir_chain ip daddr @ss-redir_set meta l4proto udp redirect to 1088
+    nft add rule inet fw4 ss-redir_chain ip6 daddr @ss-redir_set6 meta l4proto udp redirect to 1088
     nft add rule inet fw4 ss-redir_chain ip6 daddr @ss-redir_set6 meta l4proto tcp redirect to 1088
+    
 }
 
 clear_ss_redir_rule() {
