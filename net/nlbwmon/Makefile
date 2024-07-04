@@ -24,7 +24,7 @@ TARGET_CFLAGS += -I$(STAGING_DIR)/usr/include/libnl-tiny
 define Package/nlbwmon
   SECTION:=net
   CATEGORY:=Network
-  DEPENDS:=+libubox +libnl-tiny +zlib +kmod-nf-conntrack-netlink
+  DEPENDS:=+libubox +libnl-tiny +zlib +kmod-nf-conntrack-netlink +qosify
   TITLE:=OpenWrt Traffic Usage Monitor
 endef
 
