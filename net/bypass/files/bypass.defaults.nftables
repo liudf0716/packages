@@ -1,0 +1,14 @@
+#!/bin/sh
+
+uci -q batch <<-EOT
+    delete firewall.@nat[0]
+    add firewall nat
+    set firewall.@nat[0].name='bypass'
+    set firewall.@nat[0].proto='all'
+    set firewall.@nat[0].src='lan'
+    set firewall.@nat[0].device='br-lan'
+    set firewall.@nat[0].target='MASQUERADE'
+    commit firewall
+EOT
+
+exit 0
