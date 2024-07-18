@@ -1,0 +1,3 @@
+[submodule "multimedia/whispercpp"]
+	path = multimedia/whispercpp
+	url = https://github.com/liudf0716/whispercpp.git
