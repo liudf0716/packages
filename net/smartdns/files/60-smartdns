@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# if network lan is dhcp, then use the following
+proto=$(uci get network.lan.proto)
+if [ "$proto" = "dhcp" ]; then
+    interface=$(uci get network.lan.device)
+    if [ -z "$interface" ]; then
+        interface="br-lan"
+    fi
+    # get interface ip address
+    ipaddr=$(ip -4 addr show dev $interface | grep inet | awk '{print $2}' | cut -d'/' -f1)
+    if [ ! -z "$ipaddr" ]; then
+        uci -q del_list dhcp.lan.dhcp_option="6,$ipaddr"
+		uci -q add_list dhcp.lan.dhcp_option="6,$ipaddr"
+        uci commit dhcp
+        /etc/init.d/dnsmasq reload
+    fi
+fi
+    
