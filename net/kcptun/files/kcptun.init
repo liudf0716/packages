@@ -13,7 +13,7 @@ confdir=/var/etc/kcptun
 bindir=/usr/bin
 
 mkjson_server_conf() {
-	[ "$disabled" = 0 ] || return 1
+	[ "$enabled" = 1 ] || return 1
 	[ -n "$listen" ] || return 1
 	[ -n "$target" ] || return 1
 	[ -n "$target_port" ] || return 1
@@ -23,7 +23,7 @@ mkjson_server_conf() {
 }
 
 mkjson_client_conf() {
-	[ "$disabled" = 0 ] || return 1
+	[ "$enabled" = 1 ] || return 1
 	[ -n "$local_port" ] || return 1
 	[ -n "$server" ] || return 1
 	[ -n "$server_port" ] || return 1
@@ -43,7 +43,7 @@ kcptun() {
 	[ -x "$bin" ] || return
 	eval "$("validate_${cfgtype}_section" "$cfg" validate_mklocal)"
 	"validate_${cfgtype}_section" "$cfg" || return
-	[ "$disabled" = 0 ] || return
+	[ "$enabled" = 1 ] || return
 
 	json_init
 	mkjson_${cfgtype}_conf || return
@@ -123,7 +123,7 @@ validate_common_options() {
 	local mode_profiles='"fast3", "fast2", "fast", "normal", "manual"'
 
 	"${func:-validate}" "$cfgtype" "$cfg" "$@" \
-		'disabled:bool:0' \
+		'enabled:bool:0' \
 		'key:string' \
 		"crypt:or($crypt_methods)" \
 		"mode:or($mode_profiles)" \
