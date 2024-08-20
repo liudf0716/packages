@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=apfree-wifidog
-PKG_VERSION:=7.10.2082
+PKG_VERSION:=master
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=2b7b22221852732f2511e991bef5d135132a8cc50f3d612eaee77d74c51bc501
+PKG_HASH:=2df697ed696559f46a7d12fc1af3f0ecadcd4d56c2c7546eafea0578cf19cd46
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
