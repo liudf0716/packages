@@ -19,8 +19,8 @@ handle_gateway() {
 		echo "gateway_name and gateway_channel are required for $section" >&2
 		return
 	fi
-
-	# Get gateway_id from gateway_name if not set
+	
+	# if gateway_id is not set, get it from the gateway_name
 	if [ -z "$gateway_id" ]; then
 		gateway_id=$(ifconfig "$gateway_name" | awk '/HWaddr/ {print toupper($5)}' | tr -d ':')
 		if [ -z "$gateway_id" ]; then
