@@ -1,6 +1,0 @@
-#!/bin/sh
-
-if [ "$ACTION" = "ifup" ] && [ "$INTERFACE" = "wan" ]; then
-    /etc/init.d/wifidogx restart
-    logger -t wifidogx "Restart wifidogx due to $ACTION of $INTERFACE ($DEVICE)"
-fi

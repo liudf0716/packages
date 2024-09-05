@@ -45,6 +45,7 @@ prepare_wifidog_conf() {
 
 	uci_validate_section ${NAME} ${NAME} common \
 		'enabled:bool:0' \
+		'no_auth_server:bool:0' \
 		'log_level:integer:7' \
 		'device_id:string' \
 		'auth_server_hostname:string' \
@@ -62,7 +63,9 @@ prepare_wifidog_conf() {
 		'wildcard_white_list:list(string)' \
 		'enable_dns_forward:bool:1' \
 		'enable_websocket:bool:1' \
-		'js_filter:bool:1' 
+		'js_filter:bool:1' \
+		'auth_server_offline_file:string' \
+		'local_portal:string'
 
 	if [ ! -z "$app_white_list" ]; then
 		# iterate app_white_list and find the corresponding domain according to the item
@@ -96,20 +99,31 @@ prepare_wifidog_conf() {
 		done
 	fi
 
-	# set above variables to config file
-	echo "DeviceID $device_id" > ${CONFIGFILE}
-	echo "AuthServer {
-	Hostname $auth_server_hostname
-	HTTPPort $auth_server_port
-	Path $auth_server_path
+	if [ "$no_auth_server" -eq 1 ]; then
+		if [ ! -z auth_server_offline_file ]; then
+			echo "AuthServerOfflineFile $auth_server_offline_file" >> ${CONFIGFILE}
+		fi
+
+		if [ ! -z local_portal ]; then
+			echo "LocalPortal $local_portal" >> ${CONFIGFILE}
+		fi
+	else 
+		echo "DeviceID $device_id" > ${CONFIGFILE}
+		echo "AuthServer {
+		Hostname $auth_server_hostname
+		HTTPPort $auth_server_port
+		Path $auth_server_path
 }" >> ${CONFIGFILE}
+		echo "EnableWS $enable_websocket" >> ${CONFIGFILE}
+	fi
+
 	echo "CheckInterval $check_interval" >> ${CONFIGFILE}
 	echo "ClientTimeout $client_timeout" >> ${CONFIGFILE}
 	echo "JsFilter $js_filter" >> ${CONFIGFILE}
 	echo "WiredPassed $wired_passed" >> ${CONFIGFILE}
 	echo "BypassAppleCNA $apple_cna" >> ${CONFIGFILE}
 	echo "EnableDNSForward $enable_dns_forward" >> ${CONFIGFILE}
-	echo "EnableWS $enable_websocket" >> ${CONFIGFILE}
+	
 	# if has trusted_domains, parse the list to a string with ',' as separator and add it to config file
 	if [ ! -z "$trusted_domains" ]; then
 		trusted_domains=$(echo $trusted_domains | tr ' ' ',')
@@ -124,7 +138,7 @@ prepare_wifidog_conf() {
 	if [ ! -z "$trusted_wildcard_domains" ]; then
 		trusted_wildcard_domains=$(echo $trusted_wildcard_domains | tr ' ' ',')
 		echo "TrustedPanDomains $trusted_wildcard_domains" >> ${CONFIGFILE}
-	fi
+	fi	
 
 	config_foreach handle_gateway gateway
 }
