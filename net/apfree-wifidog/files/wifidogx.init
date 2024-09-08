@@ -100,11 +100,11 @@ prepare_wifidog_conf() {
 	fi
 
 	if [ "$no_auth_server" -eq 1 ]; then
-		if [ ! -z auth_server_offline_file ]; then
+		if [ ! -z "$auth_server_offline_file" ]; then
 			echo "AuthServerOfflineFile $auth_server_offline_file" >> ${CONFIGFILE}
 		fi
 
-		if [ ! -z local_portal ]; then
+		if [ ! -z "$local_portal" ]; then
 			echo "LocalPortal $local_portal" >> ${CONFIGFILE}
 		fi
 	else 
