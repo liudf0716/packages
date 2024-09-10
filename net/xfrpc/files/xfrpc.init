@@ -118,6 +118,7 @@ handle_socks5() {
 
 service_triggers() {
 	procd_add_reload_trigger "$NAME"
+	procd_add_interface_trigger "interface.*.up" wan /etc/init.d/xfrpc restart
 }
 
 start_service() {
