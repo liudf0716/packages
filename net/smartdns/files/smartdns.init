@@ -41,30 +41,21 @@ DO_RELOAD="0"
 GFW_CONF="$SMARTDNS_CONF_DIR/smartdns_gfw_domain.conf"
 GFW_DL_URL="https://raw.dov.moe/Apocalypsor/Smartdns-GFWList/master/smartdns_gfw_domain.conf"
 
-update_smartdns_gfw_conf() {
-    #wget -O /tmp/smartdns_gfw_domain.conf $GFW_DL_URL -q --no-check-certificate
-	#if [ $? -eq 0 ]; then
-	#	mv /tmp/smartdns_gfw_domain.conf $GFW_CONF
-	#fi
-	echo "TODO: update_smartdns_gfw_conf"
-}
-
 parse_smartdns_gfw_conf() {
-    if [ ! -f $GFW_CONF ]; then
+    if [ ! -f "$GFW_CONF" ]; then
         echo "no smartdns_gfw_domain.conf"
         return
     fi
-	
-	if [ -f /etc/smartdns/smartdns_gfw_nftset.conf ]; then
-		rm -f /etc/smartdns/smartdns_gfw_nftset.conf
-	fi
 
-    for nameserver in $(cat /etc/smartdns/smartdns_gfw_domain.conf | grep nameserver | awk '{print $2}'); do
-        domain_name=$(echo $nameserver | awk -F '/' '{print $2}')
-        nftset_rule=$(echo "nftset /$domain_name/#4:inet#fw4#ss-redir_set,#6:inet#fw4#ss-redir_set6")
-        echo $nftset_rule >> /etc/smartdns/smartdns_gfw_nftset.conf
-    done
-    
+    # Remove the existing nftset.conf file if it exists
+    [ -f /etc/smartdns/smartdns_gfw_nftset.conf ] && rm -f /etc/smartdns/smartdns_gfw_nftset.conf
+
+    # Use a single awk command to process the file and generate the output
+    awk '/nameserver/ {
+        split($2, parts, "/")
+        domain_name = parts[2]
+        print "nftset /" domain_name "/#4:inet#fw4#ss-redir_set,#6:inet#fw4#ss-redir_set6"
+    }' "$GFW_CONF" > /etc/smartdns/smartdns_gfw_nftset.conf
 }
 
 set_forward_dnsmasq()
@@ -780,8 +771,6 @@ check_and_add_entry() {
 	if [ ! -d "$SMARTDNS_CONF_DOWNLOAD_DIR" ]; then
 		mkdir -p "$SMARTDNS_CONF_DOWNLOAD_DIR"
 	fi
-
-	update_smartdns_gfw_conf
 
 	parse_smartdns_gfw_conf
 }
