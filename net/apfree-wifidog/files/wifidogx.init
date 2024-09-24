@@ -164,7 +164,7 @@ start_service() {
 }
 
 status_service() {
-	/usr/bin/wdctlx status
+    /usr/bin/wdctlx status
 }
 
 reload_service() {
