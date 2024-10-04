@@ -158,11 +158,11 @@ status_service() {
 }
 
 reload_service() {
-    stop
-    start
+    /usr/bin/wdctlx refresh
 }
 
 service_triggers() {
-    procd_add_reload_trigger "$NAME"
-    procd_add_interface_trigger "interface.*.up" "wan" /etc/init.d/wifidogx restart
+    procd_add_reload_trigger "wifidogx" "firewall"
+    procd_add_interface_trigger "interface.*.up" "wan" /etc/init.d/wifidogx reload
+    procd_add_interface_trigger "interface.*.up" "wan6" /etc/init.d/wifidogx reload
 }
