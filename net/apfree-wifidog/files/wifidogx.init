@@ -158,7 +158,8 @@ status_service() {
 }
 
 reload_service() {
-    /usr/bin/wdctlx refresh
+    stop
+    start
 }
 
 service_triggers() {
