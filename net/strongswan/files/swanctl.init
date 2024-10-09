@@ -644,7 +644,7 @@ config_ipsec() {
 		[ -n "$routing_table_id" ] && append routing_tables_ignored "$routing_table_id"
 	done
 
-	config_list_foreach "$conf" interface append_var interface_list
+	config_list_foreach "$conf" listen append_var interface_list
 
 	if [ -z "$interface_list" ]; then
 		WAIT_FOR_INTF=0
@@ -663,6 +663,7 @@ do_postamble() {
 	swan_xappend1 "install_routes = $install_routes"
 	[ -n "$routing_tables_ignored" ] && swan_xappend1 "ignore_routing_tables = $routing_tables_ignored"
 	[ -n "$device_list" ] && swan_xappend1 "interfaces_use = $device_list"
+	swan_xappend1 "install_virtual_ip_on = xfrm0"
 	swan_xappend1 "start-scripts {"
 	swan_xappend2 "load-all = /usr/sbin/swanctl --load-all --noprompt"
 	swan_xappend1 "}"
