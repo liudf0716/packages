@@ -676,6 +676,8 @@ config_ipsec() {
 		done
 		[ -n "$device_list" ] && WAIT_FOR_INTF=0 || WAIT_FOR_INTF=1
 	fi
+
+	config_get vip_interface "$conf" vip_interface "xfrm0"
 }
 
 do_postamble() {
@@ -684,7 +686,7 @@ do_postamble() {
 	swan_xappend1 "install_routes = $install_routes"
 	[ -n "$routing_tables_ignored" ] && swan_xappend1 "ignore_routing_tables = $routing_tables_ignored"
 	[ -n "$device_list" ] && swan_xappend1 "interfaces_use = $device_list"
-	swan_xappend1 "install_virtual_ip_on = xfrm0"
+	swan_xappend1 "install_virtual_ip_on = $vip_interface"
 	swan_xappend1 "start-scripts {"
 	swan_xappend2 "load-all = /usr/sbin/swanctl --load-all --noprompt"
 	swan_xappend1 "}"
