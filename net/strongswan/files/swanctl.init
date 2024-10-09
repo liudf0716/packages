@@ -466,6 +466,7 @@ config_remote() {
 	config_get ca_cert "$conf" ca_cert ""
 	config_get rekeytime "$conf" rekeytime
 	config_get overtime "$conf" overtime
+	config_get gateway_type "$conf" gateway_type "initiator"
 	config_get local_sourceip "$conf" local_sourceip "0.0.0.0"
 
 	config_list_foreach "$conf" remote_ca_certs append_var remote_ca_certs ","
@@ -521,7 +522,9 @@ config_remote() {
 	swanctl_xappend2 "local_addrs = $local_ip"
 	swanctl_xappend2 "remote_addrs = $remote_gateway"
 
-	[ -n "$local_sourceip" ] && swanctl_xappend2 "vips = $local_sourceip"
+	if [ "$gateway_type" = "initiator" ]; then
+		[ -n "$local_sourceip" ] && swanctl_xappend2 "vips = $local_sourceip"
+	fi
 	[ -n "$fragmentation" ] && swanctl_xappend2 "fragmentation = $fragmentation"
 	[ -n "$pools" ] && swanctl_xappend2 "pools = $pools"
 
@@ -607,9 +610,12 @@ config_remote() {
 		fatal "AuthenticationMode $auth_mode not supported"
 	fi
 
-	swanctl_xappend0 "pools {"
-	config_list_foreach "$conf" pools config_pool
-	swanctl_xappend0 "}"
+	if [ "$gateway_type" = "responder" ]; then 
+		swanctl_xappend0 ""
+		swanctl_xappend0 "pools {"
+		config_list_foreach "$conf" pools config_pool
+		swanctl_xappend0 "}"
+	fi
 
 	swanctl_xappend0 ""
 }
