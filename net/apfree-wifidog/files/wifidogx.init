@@ -99,6 +99,16 @@ prepare_external_interface() {
 	printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
 }
 
+prepare_external_interface() {
+    [ -z "$external_interface" ] && echo "No ExternalInterface " >&2 && return
+
+    local external_interface_name
+    external_interface_name=$(uci get network."$external_interface".device)
+
+    [ -z "$external_interface_name" ] && echo "Failed to get device name for $external_interface" >&2 && return
+    printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
+}
+
 prepare_wifidog_conf() {
 	[ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
 	local long_conn_mode_value='"ws", "wss", "mqtt", "none"'
