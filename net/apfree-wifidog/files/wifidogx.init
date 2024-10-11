@@ -90,6 +90,16 @@ prepare_auth_server_settings() {
     esac
 }
 
+prepare_external_interface() {
+    [ -z "$external_interface" ] && echo "No ExternalInterface " >&2 && return
+
+    local external_interface_name
+    external_interface_name=$(uci get network."$external_interface".device)
+
+    [ -z "$external_interface_name" ] && echo "Failed to get device name for $external_interface" >&2 && return
+    printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
+}
+
 prepare_wifidog_conf() {
     [ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
 
@@ -125,12 +135,15 @@ prepare_wifidog_conf() {
         'mqtt_password:string' \
         'js_filter:bool:1' \
         'auth_server_offline_file:string' \
-        'local_portal:string'
+        'local_portal:string' \
+        'external_interface:string'
 
     [ -n "$app_white_list" ] && add_white_list_entries "app_white_list" "domain_name" "trusted_domains"
     [ -n "$mac_white_list" ] && add_white_list_entries "mac_white_list" "mac_address" "trusted_macs"
     [ -n "$wildcard_white_list" ] && add_white_list_entries "wildcard_white_list" "wildcard_domain" "trusted_wildcard_domains"
 
+
+    prepare_external_interface
     prepare_auth_server_settings
     config_foreach handle_gateway gateway
     prepare_common_settings
