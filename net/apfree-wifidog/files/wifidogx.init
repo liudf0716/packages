@@ -20,7 +20,7 @@ handle_gateway() {
 		return
 	fi
 
-	# if gateway_id is not set, get it from the gateway_name
+	# Get gateway_id from gateway_name if not set
 	if [ -z "$gateway_id" ]; then
 		gateway_id=$(ifconfig "$gateway_name" | awk '/HWaddr/ {print toupper($5)}' | tr -d ':')
 		if [ -z "$gateway_id" ]; then
@@ -55,7 +55,11 @@ add_white_list_entries() {
 prepare_common_settings() {
 	printf "CheckInterval %s\nClientTimeout %s\nJsFilter %s\nWiredPassed %s\nBypassAppleCNA %s\nEnableDNSForward %s\n" \
 		"$check_interval" "$client_timeout" "$js_filter" "$wired_passed" "$apple_cna" "$enable_dns_forward" >> "$CONFIGFILE"
+	
+	printf "EnableAntiNat %s\n" "$enable_anti_nat" >> "$CONFIGFILE"
+	printf "TTLValues %s\n" "$ttl_values" >> "$CONFIGFILE"
 
+	[ -n "$anti_nat_permit_macs" ] && printf "AntiNatPermitMACs %s\n" "$anti_nat_permit_macs" >> "$CONFIGFILE"
 	[ -n "$trusted_domains" ] && printf "TrustedDomains %s\n" "$(echo "$trusted_domains" | tr ' ' ',')" >> "$CONFIGFILE"
 	[ -n "$trusted_macs" ] && printf "TrustedMACList %s\n" "$(echo "$trusted_macs" | tr ' ' ',')" >> "$CONFIGFILE"
 	[ -n "$trusted_wildcard_domains" ] && printf "TrustedPanDomains %s\n" "$(echo "$trusted_wildcard_domains" | tr ' ' ',')" >> "$CONFIGFILE"
@@ -64,9 +68,9 @@ prepare_common_settings() {
 prepare_auth_server_settings() {
 	case "$auth_server_mode" in
 	cloud)
+		printf "AuthServerMode 0\n" >> "$CONFIGFILE"
 		printf "DeviceID %s\nAuthServer {\n\tHostname %s\n\tHTTPPort %s\n\tPath %s\n}\n" \
-			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE"
-        
+			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE" 
 		case "$long_conn_mode" in
 		ws|wss)
 			ws_hostname="${ws_server_hostname:-$auth_server_hostname}"
@@ -83,7 +87,13 @@ prepare_auth_server_settings() {
 			;;
 		esac
 			;;
+	bypass)
+		printf "AuthServerMode 1\n" >> "$CONFIGFILE"
+		printf "DeviceID %s\nAuthServer {\n\tHostname %s\n\tHTTPPort %s\n\tPath %s\n}\n" \
+			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE"
+		;;
 	local)
+		printf "AuthServerMode 2\n" >> "$CONFIGFILE"
 		[ -n "$auth_server_offline_file" ] && printf "AuthServerOfflineFile %s\n" "$auth_server_offline_file" >> "$CONFIGFILE"
 		[ -n "$local_portal" ] && printf "LocalPortal %s\n" "$local_portal" >> "$CONFIGFILE"
 		;;
@@ -99,20 +109,10 @@ prepare_external_interface() {
 	printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
 }
 
-prepare_external_interface() {
-    [ -z "$external_interface" ] && echo "No ExternalInterface " >&2 && return
-
-    local external_interface_name
-    external_interface_name=$(uci get network."$external_interface".device)
-
-    [ -z "$external_interface_name" ] && echo "Failed to get device name for $external_interface" >&2 && return
-    printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
-}
-
 prepare_wifidog_conf() {
 	[ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
 	local long_conn_mode_value='"ws", "wss", "mqtt", "none"'
-	local auth_server_mode_value='"cloud", "local"'
+	local auth_server_mode_value='"cloud", "bypass", "local"'
     
 	uci_validate_section "$NAME" "$NAME" common \
 		'enabled:bool:0' \
@@ -144,7 +144,10 @@ prepare_wifidog_conf() {
 		'js_filter:bool:1' \
 		'auth_server_offline_file:string' \
 		'local_portal:string' \
-		'external_interface:string'
+		'external_interface:string'	\
+		'enable_anti_nat:bool:0' \
+		'ttl_values:string:64,128' \
+		'anti_nat_permit_macs:string'
 
 	[ -n "$app_white_list" ] && add_white_list_entries "app_white_list" "domain_name" "trusted_domains"
 	[ -n "$mac_white_list" ] && add_white_list_entries "mac_white_list" "mac_address" "trusted_macs"
@@ -174,7 +177,7 @@ start_service() {
 }
 
 status_service() {
-    /usr/bin/wdctlx status
+	/usr/bin/wdctlx status
 }
 
 reload_service() {
