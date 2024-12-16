@@ -31,11 +31,7 @@ handle_gateway() {
 		uci commit wifidogx
 	fi
 
-	printf "GatewaySetting { 
-		GatewayInterface %s
-		GatewayChannel %s
-		GatewayID %s
-	}\n" "$gateway_name" "$gateway_channel" "$gateway_id" >> "$CONFIGFILE"
+	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" >> "$CONFIGFILE"
 }
 
 add_white_list_entries() {
@@ -67,7 +63,7 @@ prepare_common_settings() {
 
 prepare_auth_server_settings() {
 	case "$auth_server_mode" in
-	cloud)
+	cloud|bypass)
 		printf "AuthServerMode 0\n" >> "$CONFIGFILE"
 		printf "DeviceID %s\nAuthServer {\n\tHostname %s\n\tHTTPPort %s\n\tPath %s\n}\n" \
 			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE" 
@@ -87,11 +83,6 @@ prepare_auth_server_settings() {
 			;;
 		esac
 			;;
-	bypass)
-		printf "AuthServerMode 1\n" >> "$CONFIGFILE"
-		printf "DeviceID %s\nAuthServer {\n\tHostname %s\n\tHTTPPort %s\n\tPath %s\n}\n" \
-			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE"
-		;;
 	local)
 		printf "AuthServerMode 2\n" >> "$CONFIGFILE"
 		[ -n "$auth_server_offline_file" ] && printf "AuthServerOfflineFile %s\n" "$auth_server_offline_file" >> "$CONFIGFILE"
