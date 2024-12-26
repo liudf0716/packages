@@ -14,9 +14,10 @@ handle_gateway() {
 	config_get gateway_name "$section" gateway_name
 	config_get gateway_channel "$section" gateway_channel
 	config_get gateway_id "$section" gateway_id
+	config_get gateway_subnetv4 "$section" gateway_subnetv4
 
-	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ]; then
-		echo "gateway_name and gateway_channel are required for $section" >&2
+	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ] || [ -z "$gateway_subnetv4" ]; then
+		echo "gateway_name and gateway_channel and gateway_subnetv4 are required for $section" >&2
 		return
 	fi
 
@@ -31,7 +32,7 @@ handle_gateway() {
 		uci commit wifidogx
 	fi
 
-	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" >> "$CONFIGFILE"
+	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" "$gateway_subnetv4" >> "$CONFIGFILE"
 }
 
 add_white_list_entries() {
