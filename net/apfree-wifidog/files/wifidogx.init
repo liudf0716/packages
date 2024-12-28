@@ -95,7 +95,13 @@ prepare_auth_server_settings() {
 prepare_external_interface() {
 	[ -z "$external_interface" ] && echo "No ExternalInterface " >&2 && return
 	local external_interface_name
-	external_interface_name=$(uci get network."$external_interface".device)
+
+	if [ "$external_interface" = "wwan" ]; then
+		external_interface_name=$(ubus call network.interface."$external_interface" status | jsonfilter -e '@.device')
+	else
+		external_interface_name=$(uci get network."$external_interface".device)
+	fi
+
 	[ -z "$external_interface_name" ] && echo "Failed to get device name for $external_interface" >&2 && return
   
 	printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
