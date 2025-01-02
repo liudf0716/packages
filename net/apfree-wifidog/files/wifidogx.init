@@ -189,4 +189,5 @@ service_triggers() {
 	procd_add_interface_trigger "interface.*.up" "wan6" /etc/init.d/wifidogx reload
 	procd_add_interface_trigger "interface.*.up" "wwan" /etc/init.d/wifidogx reload
 	procd_add_interface_trigger "interface.*.up" "wwan6" /etc/init.d/wifidogx reload
+	procd_add_interface_trigger "interface.*.up" "lan" /usr/bin/wdctlx refresh
 }
