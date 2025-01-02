@@ -107,6 +107,8 @@ prepare_auth_server_settings() {
 		[ -n "$local_portal" ] && printf "LocalPortal %s\n" "$local_portal" >> "$CONFIGFILE"
 		;;
 	esac
+
+	[ -n "$internet_offline_file" ] && printf "InternetOfflineFile %s\n" "$internet_offline_file" >> "$CONFIGFILE"
 }
 
 prepare_external_interface() {
@@ -158,6 +160,7 @@ prepare_wifidog_conf() {
 		'mqtt_password:string' \
 		'js_filter:bool:1' \
 		'auth_server_offline_file:string' \
+		'internet_offline_file:string' \
 		'local_portal:string' \
 		'external_interface:string'	\
 		'enable_anti_nat:bool:0' \
