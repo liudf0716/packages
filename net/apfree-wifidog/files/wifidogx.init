@@ -10,14 +10,14 @@ CONFIGFILE="/tmp/wifidogx.conf"
 handle_gateway() {
 	local section="$1"
 	local gateway_name gateway_channel gateway_id
+	local gateway_subnetv4
 
 	config_get gateway_name "$section" gateway_name
 	config_get gateway_channel "$section" gateway_channel
 	config_get gateway_id "$section" gateway_id
-	config_get gateway_subnetv4 "$section" gateway_subnetv4
 
-	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ] || [ -z "$gateway_subnetv4" ]; then
-		echo "gateway_name and gateway_channel and gateway_subnetv4 are required for $section" >&2
+	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ] ; then
+		echo "gateway_name and gateway_channel  are required for $section" >&2
 		return
 	fi
 
@@ -31,6 +31,23 @@ handle_gateway() {
 		uci set wifidogx."$section".gateway_id="$gateway_id"
 		uci commit wifidogx
 	fi
+	# according to the gateway_name to get the subnetv4
+	local gateway_ipv4=$(ifconfig "$gateway_name" | awk '/inet addr:/ {print $2}' | cut -d: -f2)
+	local gateway_maskv4=$(ifconfig "$gateway_name" | awk '/Mask:/ {print $4}' | cut -d: -f2)
+	[ -z "$gateway_ipv4" ] && echo "Failed to get gateway_ipv4 for $gateway_name" >&2 && return
+	[ -z "$gateway_maskv4" ] && echo "Failed to get gateway_maskv4 for $gateway_name" >&2 && return
+
+	# change the gateway_ip4/gateway_maskv4 to CIDR format
+	local mask_bits=0
+	local mask_value=$(printf '%d' "0x$(echo $gateway_maskv4 | tr '.' ' ' | awk '{printf "%02x%02x%02x%02x",$1,$2,$3,$4}')")
+	while [ $mask_value -ne 0 ]; do
+		mask_bits=$((mask_bits + (mask_value & 1)))
+		mask_value=$((mask_value >> 1))
+	done
+	gateway_subnetv4="$gateway_ipv4/$mask_bits"
+	
+	uci set wifidogx."$section".gateway_subnetv4="$gateway_subnetv4"
+	uci commit wifidogx
 
 	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" "$gateway_subnetv4" >> "$CONFIGFILE"
 }
@@ -189,5 +206,5 @@ service_triggers() {
 	procd_add_interface_trigger "interface.*.up" "wan6" /etc/init.d/wifidogx reload
 	procd_add_interface_trigger "interface.*.up" "wwan" /etc/init.d/wifidogx reload
 	procd_add_interface_trigger "interface.*.up" "wwan6" /etc/init.d/wifidogx reload
-	procd_add_interface_trigger "interface.*.up" "lan" /usr/bin/wdctlx refresh
+	procd_add_interface_trigger "interface.*.up" "lan" /etc/init.d/wifidogx reload
 }
