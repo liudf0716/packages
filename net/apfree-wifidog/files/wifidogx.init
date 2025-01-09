@@ -74,9 +74,22 @@ prepare_common_settings() {
 	printf "TTLValues %s\n" "$ttl_values" >> "$CONFIGFILE"
 
 	[ -n "$anti_nat_permit_macs" ] && printf "AntiNatPermitMACs %s\n" "$anti_nat_permit_macs" >> "$CONFIGFILE"
-	[ -n "$trusted_domains" ] && printf "TrustedDomains %s\n" "$(echo "$trusted_domains" | tr ' ' ',')" >> "$CONFIGFILE"
-	[ -n "$trusted_macs" ] && printf "TrustedMACList %s\n" "$(echo "$trusted_macs" | tr ' ' ',')" >> "$CONFIGFILE"
-	[ -n "$trusted_wildcard_domains" ] && printf "TrustedPanDomains %s\n" "$(echo "$trusted_wildcard_domains" | tr ' ' ',')" >> "$CONFIGFILE"
+	
+	process_trusted_list() {
+		local list="$1"
+		local config_name="$2"
+		
+		if [ -n "$list" ]; then
+			# Clean up whitespace and remove duplicates
+			list=$(echo "$list" | sed -e 's/^[[:space:]]*//;s/[[:space:]]*$//;s/[[:space:]]\+/ /g' \
+				| tr ' ' '\n' | sort -u | tr '\n' ',' | sed 's/,$//')
+			printf "%s %s\n" "$config_name" "$list" >> "$CONFIGFILE"
+		fi
+	}
+
+	process_trusted_list "$trusted_domains" "TrustedDomains"
+	process_trusted_list "$trusted_macs" "TrustedMACList"
+	process_trusted_list "$trusted_wildcard_domains" "TrustedPanDomains"
 }
 
 prepare_auth_server_settings() {
