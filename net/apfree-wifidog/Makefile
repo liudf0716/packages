@@ -63,6 +63,7 @@ define Package/apfree-wifidog/install
 	$(INSTALL_DIR) $(1)/etc/wifidogx
 	$(INSTALL_DIR) $(1)/www/cgi-bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wifi-config $(1)/www/cgi-bin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wifi-diag $(1)/www/cgi-bin/
 endef
 
 $(eval $(call BuildPackage,apfree-wifidog))
