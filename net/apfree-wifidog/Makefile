@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=apfree-wifidog
-PKG_VERSION:=8.01.2307
+PKG_VERSION:=8.02.2353
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
@@ -20,14 +20,19 @@ PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
 PKG_LICENSE_FILES:=COPYING
 
+PKG_BUILD_DEPENDS:=bpf-headers
+
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
+include $(INCLUDE_DIR)/bpf.mk
 
 define Package/apfree-wifidog
   SUBMENU:=Captive Portals
   SECTION:=net
   CATEGORY:=Network
-  DEPENDS:=+zlib +libjson-c +libevent2 +libevent2-openssl +libuci +openssl-util +libnetfilter-queue +conntrack +libmosquitto +libnftnl +libmnl
+  DEPENDS:=+zlib +libjson-c +libevent2 +libevent2-openssl +libuci \
+  			+openssl-util +libnetfilter-queue +conntrack +libmosquitto \
+			+libnftnl +libmnl +tc-full $(BPF_DEPENDS)
   TITLE:=Apfree's wireless captive portal solution
   URL:=https://github.com/liudf0716/apfree_wifidog
 endef
@@ -39,6 +44,10 @@ define Package/apfree-wifidog/description
   It's enhanced wifidog
 endef
 
+define Build/Compile
+	$(call CompileBPF,$(PKG_BUILD_DIR)/ebpf/aw-bpf.c)
+endef
+
 define Package/apfree-wifidog/conffiles
 /etc/config/wifidogx
 endef
@@ -47,6 +56,7 @@ define Package/apfree-wifidog/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wifidogx $(1)/usr/bin/wifidogx
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wdctlx $(1)/usr/bin/wdctlx
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/aw-bpfctl $(1)/usr/bin/aw-bpfctl
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/wdping $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc
@@ -64,6 +74,8 @@ define Package/apfree-wifidog/install
 	$(INSTALL_DIR) $(1)/www/cgi-bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wifi-config $(1)/www/cgi-bin/
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wifi-diag $(1)/www/cgi-bin/
+	$(INSTALL_DIR) $(1)/lib/bpf
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/ebpf/aw-bpf.o $(1)/lib/bpf
 endef
 
 $(eval $(call BuildPackage,apfree-wifidog))
