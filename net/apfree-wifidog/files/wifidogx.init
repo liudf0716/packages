@@ -8,16 +8,32 @@ PROG="/usr/bin/${NAME}"
 CONFIGFILE="/tmp/wifidogx.conf"
 
 load_aw_bpf() {
+	local iface="$1"
 	local bpf_file="/lib/bpf/aw-bpf.o"
-	if [ -f "$bpf_file" ]; then
-		tc filter del dev "$1" ingress
-		tc filter del dev "$1" egress
-		tc qdisc del dev "$1" clsact
 
-		tc qdisc add dev "$1" clsact
-		tc filter add dev "$1" ingress bpf da obj "$bpf_file" sec tc/ingress
-		tc filter add dev "$1" egress bpf da obj "$bpf_file" sec tc/egress
+	# Check if interface exists
+	[ -z "$iface" ] && return 1
+	[ ! -e "/sys/class/net/$iface" ] && return 1
+
+	# Check if BPF file exists
+	[ ! -f "$bpf_file" ] && return 1
+
+	# Clean up existing filters and qdisc
+	tc qdisc show dev "$iface" | grep -q clsact && {
+		tc filter del dev "$iface" ingress 2>/dev/null
+		tc filter del dev "$iface" egress 2>/dev/null
+		tc qdisc del dev "$iface" clsact 2>/dev/null
+	}
+
+	# Add new filters
+	tc qdisc add dev "$iface" clsact 2>/dev/null
+	if [ $? -eq 0 ]; then
+		tc filter add dev "$iface" ingress bpf da obj "$bpf_file" sec tc/ingress 2>/dev/null
+		tc filter add dev "$iface" egress bpf da obj "$bpf_file" sec tc/egress 2>/dev/null
+		return 0
 	fi
+
+	return 1
 }
 
 handle_gateway() {
@@ -63,7 +79,7 @@ handle_gateway() {
 	uci commit wifidogx
 
 	load_aw_bpf "$gateway_name"
-	
+
 	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" "$gateway_subnetv4" >> "$CONFIGFILE"
 }
 
