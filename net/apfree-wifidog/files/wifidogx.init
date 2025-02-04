@@ -7,6 +7,19 @@ NAME=wifidogx
 PROG="/usr/bin/${NAME}"
 CONFIGFILE="/tmp/wifidogx.conf"
 
+load_aw_bpf() {
+	local bpf_file="/lib/bpf/aw-bpf.o"
+	if [ -f "$bpf_file" ]; then
+		tc filter del dev "$1" ingress
+		tc filter del dev "$1" egress
+		tc qdisc del dev "$1" clsact
+
+		tc qdisc add dev "$1" clsact
+		tc filter add dev "$1" ingress bpf da obj "$bpf_file" sec tc/ingress
+		tc filter add dev "$1" egress bpf da obj "$bpf_file" sec tc/egress
+	fi
+}
+
 handle_gateway() {
 	local section="$1"
 	local gateway_name gateway_channel gateway_id
@@ -49,6 +62,8 @@ handle_gateway() {
 	uci set wifidogx."$section".gateway_subnetv4="$gateway_subnetv4"
 	uci commit wifidogx
 
+	load_aw_bpf "$gateway_name"
+	
 	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" "$gateway_subnetv4" >> "$CONFIGFILE"
 }
 
