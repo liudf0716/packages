@@ -40,10 +40,13 @@ handle_gateway() {
 	local section="$1"
 	local gateway_name gateway_channel gateway_id
 	local gateway_subnetv4
+	local gateway_auth_enabled
 
 	config_get gateway_name "$section" gateway_name
 	config_get gateway_channel "$section" gateway_channel
 	config_get gateway_id "$section" gateway_id
+	config_get gateway_auth_enabled "$section" gateway_auth_enabled 1
+
 
 	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ] ; then
 		echo "gateway_name and gateway_channel  are required for $section" >&2
@@ -80,7 +83,8 @@ handle_gateway() {
 
 	load_aw_bpf "$gateway_name"
 
-	printf "GatewaySetting {\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" "$gateway_name" "$gateway_channel" "$gateway_id" "$gateway_subnetv4" >> "$CONFIGFILE"
+	printf "GatewaySetting {\n\tGatewayAuthEnabled %s\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" \
+		 "${gateway_auth_enabled}" "${gateway_name}" "${gateway_channel}" "${gateway_id}" "${gateway_subnetv4}" >> "$CONFIGFILE"
 }
 
 add_white_list_entries() {
