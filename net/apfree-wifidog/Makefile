@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=90e7a4eaa12dcf8a815291460a4a9e183c09ba1f03b3302c4e2045720a90fb3e
+PKG_HASH:=1ca5aa7d249b029ee71275fc01f7044e1be6d4dc967c8e28c06ab573d5d72b7b
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -25,6 +25,7 @@ PKG_BUILD_DEPENDS:=bpf-headers
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/bpf.mk
+include $(INCLUDE_DIR)/kernel.mk
 
 define Package/apfree-wifidog
   SUBMENU:=Captive Portals
@@ -44,8 +45,17 @@ define Package/apfree-wifidog/description
   It's enhanced wifidog
 endef
 
+define KernelPackage/xdpi
+  SECTION:=kernel
+  SUBMENU:=Network Support
+  TITLE:=xdpi ebpf module
+  FILES:=$(PKG_BUILD_DIR)/ebpf/xdpi-bpf.ko
+  AUTOLOAD:=$(call AutoProbe,xdpi)
+endef
+
 define Build/Compile
 	$(call CompileBPF,$(PKG_BUILD_DIR)/ebpf/aw-bpf.c)
+	$(KERNEL_MAKE) M="$(PKG_BUILD_DIR)/ebpf" modules
 endef
 
 define Package/apfree-wifidog/conffiles
@@ -79,3 +89,4 @@ define Package/apfree-wifidog/install
 endef
 
 $(eval $(call BuildPackage,apfree-wifidog))
+$(eval $(call KernelPackage,xdpi))
