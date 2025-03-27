@@ -18,6 +18,9 @@ load_aw_bpf() {
 	# Check if BPF file exists
 	[ ! -f "$bpf_file" ] && return 1
 
+	# if xdpi-bpf is unloaded, try to load it
+	lsmod | grep -q xdpi_bpf || modprobe xdpi_bpf 2>/dev/null || true
+
 	# Clean up existing filters and qdisc
 	tc qdisc show dev "$iface" | grep -q clsact && {
 		tc filter del dev "$iface" ingress 2>/dev/null
@@ -30,6 +33,7 @@ load_aw_bpf() {
 	if [ $? -eq 0 ]; then
 		tc filter add dev "$iface" ingress bpf da obj "$bpf_file" sec tc/ingress 2>/dev/null
 		tc filter add dev "$iface" egress bpf da obj "$bpf_file" sec tc/egress 2>/dev/null
+		tc filter add dev "$iface" ingress bpf da obj "$bpf_file" sec classifier/xdpi 2>/dev/null
 		return 0
 	fi
 
