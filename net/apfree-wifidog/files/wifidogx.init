@@ -7,9 +7,14 @@ NAME=wifidogx
 PROG="/usr/bin/${NAME}"
 CONFIGFILE="/tmp/wifidogx.conf"
 
-load_aw_bpf() {
-	local iface="$1"
+unload_aw_bpf() {
+	local gateway_name="$1"
+	local iface
 	local bpf_file="/lib/bpf/aw-bpf.o"
+
+	config_get gateway_name "$section" gateway_name
+	iface=$gateway_name
+	echo "unload_aw_bpf: $iface"
 
 	# Check if interface exists
 	[ -z "$iface" ] && return 1
@@ -18,22 +23,103 @@ load_aw_bpf() {
 	# Check if BPF file exists
 	[ ! -f "$bpf_file" ] && return 1
 
-	# if xdpi-bpf is unloaded, try to load it
-	lsmod | grep -q xdpi_bpf || modprobe xdpi_bpf 2>/dev/null || true
-
 	# Clean up existing filters and qdisc
 	tc qdisc show dev "$iface" | grep -q clsact && {
-		tc filter del dev "$iface" ingress 2>/dev/null
-		tc filter del dev "$iface" egress 2>/dev/null
-		tc qdisc del dev "$iface" clsact 2>/dev/null
+		tc filter del dev "$iface" ingress 
+		tc filter del dev "$iface" egress 
+		tc qdisc del dev "$iface" clsact 
 	}
+
+	return 0
+}
+
+unload_xdpi() {
+    # Check if module is actually loaded
+    if lsmod | grep -q "xdpi"; then
+        echo "Attempting to unload xdpi module..."
+        
+        # Check if module is in use
+        local module_users=$(lsmod | grep "xdpi" | awk '{print $3}')
+        if [ "$module_users" != "0" ]; then
+            echo "Module is in use by $module_users processes. Finding users..."
+            # List processes using the module
+            for pid in $(lsof -t /dev/xdpi* 2>/dev/null); do
+                echo "Process using xdpi: $(ps -p $pid -o comm=)"
+            done
+        fi
+        
+        # Try to force unload the module
+        if ! /usr/sbin/rmmod -f xdpi_bpf 2>/dev/null; then
+            # If force fails, try finding the exact module name
+            local exact_module=$(lsmod | grep xdpi | awk '{print $1}')
+            if [ -n "$exact_module" ] && [ "$exact_module" != "xdpi-bpf" ]; then
+                echo "Found module with name $exact_module, attempting to unload..."
+                rmmod -f "$exact_module" 2>/dev/null || {
+                    echo "Failed to unload xdpi module ($exact_module)" >&2
+                    return 1
+                }
+            else
+                echo "Failed to unload xdpi module" >&2
+                return 1
+            fi
+        fi
+        
+        echo "Module unloaded successfully"
+    else
+        echo "xdpi module is not loaded"
+    fi
+
+    return 0
+}
+
+load_xdpi() {
+	# Load xdpi-bpf module if not loaded
+	if ! lsmod | grep -q xdpi; then
+		modprobe xdpi-bpf
+		if [ $? -ne 0 ]; then
+			echo "Failed to load xdpi module" >&2
+			return 1
+		fi
+	fi
+
+	return 0
+}
+
+reload_xdpi() {
+	# Unload and reload xdpi-bpf module
+	unload_xdpi
+	load_xdpi
+	
+	# Check if xdpi-bpf module is loaded
+	if ! lsmod | grep -q xdpi; then
+		echo "xdpi module not loaded" >&2
+		
+		return 1
+	fi
+
+	return 0
+}
+
+load_aw_bpf() {
+	local gateway_name="$1"
+	local iface
+	local bpf_file="/lib/bpf/aw-bpf.o"
+
+	config_get gateway_name "$section" gateway_name
+	iface=$gateway_name
+
+	# Check if interface exists
+	[ -z "$iface" ] && return 1
+	[ ! -e "/sys/class/net/$iface" ] && return 1
+
+	# Check if BPF file exists
+	[ ! -f "$bpf_file" ] && return 1
 
 	# Add new filters
 	tc qdisc add dev "$iface" clsact 2>/dev/null
 	if [ $? -eq 0 ]; then
-		tc filter add dev "$iface" ingress bpf da obj "$bpf_file" sec tc/ingress 2>/dev/null
-		tc filter add dev "$iface" egress bpf da obj "$bpf_file" sec tc/egress 2>/dev/null
-		tc filter add dev "$iface" ingress bpf da obj "$bpf_file" sec classifier/xdpi 2>/dev/null
+		tc filter add dev "$iface" ingress prio 1 bpf da obj "$bpf_file" sec tc/ingress 
+		tc filter add dev "$iface" egress prio 1 bpf da obj "$bpf_file" sec tc/egress 
 		return 0
 	fi
 
@@ -84,8 +170,6 @@ handle_gateway() {
 	
 	uci set wifidogx."$section".gateway_subnetv4="$gateway_subnetv4"
 	uci commit wifidogx
-
-	load_aw_bpf "$gateway_name"
 
 	printf "GatewaySetting {\n\tGatewayAuthEnabled %s\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" \
 		 "${gateway_auth_enabled}" "${gateway_name}" "${gateway_channel}" "${gateway_id}" "${gateway_subnetv4}" >> "$CONFIGFILE"
@@ -225,6 +309,9 @@ prepare_wifidog_conf() {
 
 	prepare_external_interface
 	prepare_auth_server_settings
+	config_foreach unload_aw_bpf gateway
+	reload_xdpi
+	config_foreach load_aw_bpf gateway
 	config_foreach handle_gateway gateway
 	prepare_common_settings
 }
@@ -244,6 +331,14 @@ start_service() {
 	procd_set_param respawn
 	procd_set_param file /etc/config/wifidogx
 	procd_close_instance
+}
+
+stop_service() {
+	echo "Stopping $NAME..." 
+	config_load "$NAME"
+	config_foreach unload_aw_bpf gateway
+	sleep 1
+	rmmod xdpi_bpf
 }
 
 status_service() {
