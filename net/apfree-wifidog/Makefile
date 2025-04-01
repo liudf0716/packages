@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=apfree-wifidog
-PKG_VERSION:=8.03.2476
+PKG_VERSION:=8.04.2483
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=896d4973a43efd9c16d4937a6fe112fbfa7ee9fbb1b521447361ad3b615d5776
+PKG_HASH:=2da8591394c2e4fab2160aa47013f3aa74804d06453d8c3aae9ad7d02a543195
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -28,7 +28,7 @@ include $(INCLUDE_DIR)/bpf.mk
 
 define Package/apfree-wifidog
   SUBMENU:=Captive Portals
-  SECTION:=net
+  SECTION:=nekt
   CATEGORY:=Network
   DEPENDS:=+zlib +libjson-c +libevent2 +libevent2-openssl +libuci \
   			+openssl-util +libnetfilter-queue +conntrack +libmosquitto \
