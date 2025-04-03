@@ -19,6 +19,7 @@ PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 
 GO_PKG:=go-snmp-agentx
+GOPROXY_URL:=https://goproxy.cn,direct
 GO_PKG_BUILD_PKG:=go-snmp-agentx
 
 include $(INCLUDE_DIR)/package.mk
@@ -36,6 +37,11 @@ define Package/$(PKG_NAME)
   CATEGORY:=Network
   TITLE:=Golang AgentX implementation for SNMP extension
   DEPENDS:=$(GO_ARCH_DEPENDS) +snmpd
+endef
+
+define Build/Compile
+	export GOPROXY="https://goproxy.cn"; \
+	$(call GoPackage/Build/Compile)
 endef
 
 $(eval $(call BuildPackage,$(PKG_NAME)))
