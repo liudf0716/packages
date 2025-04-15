@@ -38,6 +38,7 @@ handle_tcp() {
 
 	uci_validate_section xfrpc tcp $section \
 		'enabled:bool:1' \
+		'service_type:string' \
 		'local_ip:host' \
 		'local_port:uinteger' \
 		'remote_port:uinteger' 
@@ -45,9 +46,23 @@ handle_tcp() {
 	# if enabled is 0, then return
 	[ $enabled = 0 ] && return
 
+	# Validate service_type if provided
+	if [ -n "$service_type" ]; then
+		case "$service_type" in
+			ssh|mstsc|rdp|vnc|telnet)
+				# Valid service type
+				;;
+			*)
+				echo "Error: Invalid service_type '$service_type'. Must be one of: ssh, mstsc, rdp, vnc, telnet"
+				return 1
+				;;
+		esac
+	fi
+
 	# Write the validated settings to the config file
 	echo "[${section}]" >> "$config"
 	echo "type = tcp" >> "$config"
+	[ -z "$service_type" ] || echo "service_type = $service_type" >> "$config"
 	[ -z "$local_ip" ] || echo "local_ip = $local_ip" >> "$config"
 	[ -z "$local_port" ] || echo "local_port = $local_port" >> "$config"
 	[ -z "$remote_port" ] || echo "remote_port = $remote_port" >> "$config"
@@ -70,6 +85,7 @@ handle_http() {
 	# Write the validated settings to the config file
 	echo "[${section}]" >> "$config"
 	echo "type = http" >> "$config"
+	echo "service_type = http" >> "$config"
 	[ -z "$local_ip" ] || echo "local_ip = $local_ip" >> "$config"
 	[ -z "$local_port" ] || echo "local_port = $local_port" >> "$config"
 	[ -z "$custom_domains" ] || echo "custom_domains = $custom_domains" >> "$config"
@@ -93,6 +109,7 @@ handle_https() {
 	# Write the validated settings to the config file
 	echo "[${section}]" >> "$config"
 	echo "type = https" >> "$config"
+	echo "service_type = https" >> "$config"
 	[ -z "$local_ip" ] || echo "local_ip = $local_ip" >> "$config"
 	[ -z "$local_port" ] || echo "local_port = $local_port" >> "$config"
 	[ -z "$custom_domains" ] || echo "custom_domains = $custom_domains" >> "$config"
