@@ -30,44 +30,27 @@ unload_aw_bpf() {
 		tc qdisc del dev "$iface" clsact 
 	}
 
+	[ -e /sys/fs/bpf/tc/globals/ipv4_map ] && rm -f /sys/fs/bpf/tc/globals/ipv4_map
+	[ -e /sys/fs/bpf/tc/globals/ipv6_map ] && rm -f /sys/fs/bpf/tc/globals/ipv6_map
+	[ -e /sys/fs/bpf/tc/globals/mac_map ] && rm -f /sys/fs/bpf/tc/globals/mac_map
+	[ -e /sys/fs/bpf/tc/globals/tcp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/tcp_conn_map
+	[ -e /sys/fs/bpf/tc/globals/xdpi_l7_map ] && rm -f /sys/fs/bpf/tc/globals/xdpi_l7_map
+
 	return 0
 }
 
 unload_xdpi() {
-    # Check if module is actually loaded
-    if lsmod | grep -q "xdpi"; then
-        echo "Attempting to unload xdpi module..."
-        
-        # Check if module is in use
-        local module_users=$(lsmod | grep "xdpi" | awk '{print $3}')
-        if [ "$module_users" != "0" ]; then
-            echo "Module is in use by $module_users processes. Finding users..."
-            # List processes using the module
-            for pid in $(lsof -t /dev/xdpi* 2>/dev/null); do
-                echo "Process using xdpi: $(ps -p $pid -o comm=)"
-            done
-        fi
-        
-        # Try to force unload the module
-        if ! /usr/sbin/rmmod -f xdpi_bpf 2>/dev/null; then
-            # If force fails, try finding the exact module name
-            local exact_module=$(lsmod | grep xdpi | awk '{print $1}')
-            if [ -n "$exact_module" ] && [ "$exact_module" != "xdpi-bpf" ]; then
-                echo "Found module with name $exact_module, attempting to unload..."
-                rmmod -f "$exact_module" 2>/dev/null || {
-                    echo "Failed to unload xdpi module ($exact_module)" >&2
-                    return 1
-                }
-            else
-                echo "Failed to unload xdpi module" >&2
-                return 1
-            fi
-        fi
-        
-        echo "Module unloaded successfully"
-    else
-        echo "xdpi module is not loaded"
-    fi
+	# check if xdpi-bpf module is loaded
+	if ! lsmod | grep -q xdpi; then
+		echo "xdpi module not loaded" >&2
+		return 0
+	fi
+
+    rmmod xdpi-bpf
+	if [ $? -ne 0 ]; then
+		echo "Failed to unload xdpi module" >&2
+		return 1
+	fi
 
     return 0
 }
@@ -337,8 +320,11 @@ stop_service() {
 	echo "Stopping $NAME..." 
 	config_load "$NAME"
 	config_foreach unload_aw_bpf gateway
+	
 	sleep 1
-	rmmod xdpi_bpf
+	
+	# Properly unload xdpi module
+	unload_xdpi
 }
 
 status_service() {
@@ -346,8 +332,8 @@ status_service() {
 }
 
 reload_service() {
-	stop
-	start
+	stop_service
+	start_service
 }
 
 service_triggers() {
