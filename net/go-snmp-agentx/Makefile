@@ -29,7 +29,9 @@ define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/bin/
 	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/$(PKG_NAME) $(1)/usr/bin/
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/go-snmp-agentx.init $(1)/etc/init.d/go-snmp-agentx
+	$(INSTALL_BIN) ./files/go-snmp-agentx.init $(1)/etc/init.d/agentx
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_CONF) ./files/go-snmp-agentx.config $(1)/etc/config/agentx
 endef
 
 define Package/$(PKG_NAME)
