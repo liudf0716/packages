@@ -2,36 +2,44 @@
 # Copyright (C) 2006-2011 OpenWrt.org
 
 START=99
-STOP=50
 
 USE_PROCD=1
 PROG=/usr/bin/go-snmp-agentx
 
 start_service() {
-	config_load agentx
-
-	local host port interval
-	config_get host agentx host '127.0.0.1'
-	config_get port agentx port '162'
-	config_get interval agentx interval '600'
-
 	# 加载 snmpd 配置中的 agentxsocket
 	config_load snmpd
 	local socket
 	config_get socket snmpd agentxsocket '/var/run/agentx.sock'
 
+	config_load agentx
+	local host port interval
+	config_get host trap host ''
+	config_get port trap port '162'
+	config_get interval trap interval '600'
+
 	procd_open_instance
 	procd_set_param reload_signal USR1
-	procd_set_param command $PROG \
-		--socket "$socket" \
-		--trapServer "$host" \
-		--trapPort "$port" \
-		--trapInterval "$interval"
+
+	if [ "$host" == '' ]; then
+		procd_set_param command $PROG --socket "$socket"
+	else
+		procd_set_param command $PROG \
+			--socket "$socket" \
+			--trapServer "$host" \
+			--trapPort "$port" \
+			--trapInterval "$interval"
+	fi
+
+	procd_set_param respawn
 	procd_close_instance
 }
 
+reload_service() {
+	stop
+	start
+}
+
 service_triggers() {
-	procd_add_reload_interface_trigger loopback
-	procd_add_reload_interface_trigger lan
-	procd_add_reload_interface_trigger snmpd
+	procd_add_reload_trigger 'agentx' 'snmpd'
 }
