@@ -1,14 +1,14 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=go-snmp-agentx
-PKG_VERSION:=0.0.1
+PKG_VERSION:=master
 PKG_RELEASE:=1
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL:=https://github.com/gigibox/go-snmp-agentx.git
-PKG_SOURCE_VERSION:=master
-PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/gigibox/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
+PKG_HASH:=85cdc78e1a2dd2f009bfc69bfaea69bedb035a7dc717db89058b12d10accc453
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=ZhangZengfei <zh.zengfei@gmail.com>
 PKG_LICENSE:=Apache-2.0
@@ -28,6 +28,8 @@ include ../../lang/golang/golang-package.mk
 define Package/$(PKG_NAME)/install
 	$(INSTALL_DIR) $(1)/usr/bin/
 	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/$(PKG_NAME) $(1)/usr/bin/
+	$(INSTALL_DIR) $(1)/usr/share/3ginfo-lite/
+	$(INSTALL_BIN) ./files/modeminfo.sh $(1)/usr/share/3ginfo-lite/modeminfo.sh
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/go-snmp-agentx.init $(1)/etc/init.d/agentx
 	$(INSTALL_DIR) $(1)/etc/config
