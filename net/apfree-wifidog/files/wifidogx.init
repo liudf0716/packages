@@ -316,24 +316,13 @@ start_service() {
 	procd_close_instance
 }
 
-stop_service() {
-	echo "Stopping $NAME..." 
-	config_load "$NAME"
-	config_foreach unload_aw_bpf gateway
-	
-	sleep 1
-	
-	# Properly unload xdpi module
-	unload_xdpi
-}
-
 status_service() {
 	/usr/bin/wdctlx status
 }
 
 reload_service() {
-	stop_service
-	start_service
+	stop
+	start
 }
 
 service_triggers() {
