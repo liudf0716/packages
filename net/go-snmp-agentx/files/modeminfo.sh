@@ -202,7 +202,8 @@ echo '{'
 echo '  "device": "'"$DEVICE"'",'
 echo '  "chip_temp": '"$CHIPTEMP"','
 echo '  "modem": "'"$MODEL"'",'
-echo '  "signal": '"$SIGNAL"
+echo '  "signal": '"$SIGNAL"','
+echo '  "rsrp": '"$RSRP"
 echo '}'
 
 exit 0
