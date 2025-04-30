@@ -12,7 +12,7 @@ PKG_VERSION:=4.04.855
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/xfrpc/tar.gz/master?
+PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/xfrpc/tar.gz/$(PKG_VERSION)?
 PKG_HASH:=2f144eea0e9f237cf5acd79da577bae2b6f716cd0caf2a5e93e77d413fcce042
 PKG_BUILD_DIR:=$(BUILD_DIR)/xfrpc-$(PKG_VERSION)
 
