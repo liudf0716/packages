@@ -82,8 +82,8 @@ handle_http() {
 		'local_port:uinteger' \
 		'custom_domains:string' \
 		'subdomain:string' \
-		'start_time:string:' \
-		'end_time:string:'
+		'start_time:string' \
+		'end_time:string'
 
 	# if enabled is 0, then return
 	[ $enabled = 0 ] && return
@@ -110,8 +110,8 @@ handle_https() {
 		'local_port:uinteger' \
 		'custom_domains:string' \
 		'subdomain:string' \
-		'start_time:string:' \
-		'end_time:string:'
+		'start_time:string' \
+		'end_time:string'
 	
 	# if enabled is 0, then return
 	[ $enabled = 0 ] && return
@@ -135,8 +135,8 @@ handle_socks5() {
 	uci_validate_section xfrpc socks5 $section \
 		'enabled:bool:1' \
 		'remote_port:uinteger' \
-		'start_time:string:' \
-		'end_time:string:'
+		'start_time:string' \
+		'end_time:string'
 
 	# if enabled is 0, then return
 	[ $enabled = 0 ] && return
