@@ -196,7 +196,7 @@ start_service() {
 	config_foreach handle_iod iod "$conf_file"
 
 	procd_open_instance
-	procd_set_param command "$PROG" -c "$conf_file" -f -d $loglevel
+	procd_set_param command "$PROG" -c "$conf_file" -s -f -d $loglevel
 	procd_set_param file "$conf_file"
 	procd_set_param respawn
 	procd_close_instance
