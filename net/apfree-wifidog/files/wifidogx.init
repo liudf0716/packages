@@ -34,6 +34,7 @@ unload_aw_bpf() {
 	[ -e /sys/fs/bpf/tc/globals/ipv6_map ] && rm -f /sys/fs/bpf/tc/globals/ipv6_map
 	[ -e /sys/fs/bpf/tc/globals/mac_map ] && rm -f /sys/fs/bpf/tc/globals/mac_map
 	[ -e /sys/fs/bpf/tc/globals/tcp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/tcp_conn_map
+	[ -e /sys/fs/bpf/tc/globals/udp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/udp_conn_map
 	[ -e /sys/fs/bpf/tc/globals/xdpi_l7_map ] && rm -f /sys/fs/bpf/tc/globals/xdpi_l7_map
 
 	return 0
@@ -46,13 +47,48 @@ unload_xdpi() {
 		return 0
 	fi
 
-    rmmod xdpi-bpf
-	if [ $? -ne 0 ]; then
-		echo "Failed to unload xdpi module" >&2
+	# Get module dependencies before unloading
+	echo "Module dependencies before unloading:" >&2
+	lsmod | grep xdpi >&2
+
+	# Try to unload dependent modules first
+	local dependent_modules
+	dependent_modules=$(lsmod | grep xdpi | awk '{print $4}' | tr ',' '\n' | grep -v '^$')
+	if [ -n "$dependent_modules" ]; then
+		echo "Attempting to unload dependent modules:" >&2
+		for module in $dependent_modules; do
+			echo "Unloading dependent module: $module" >&2
+			rmmod "$module" 2>/dev/null
+		done
+	fi
+
+	# Try to unload the module and capture any error messages
+	local rmmod_output
+	rmmod_output=$(rmmod xdpi-bpf 2>&1)
+	local rmmod_status=$?
+
+	if [ $rmmod_status -ne 0 ]; then
+		echo "Failed to unload xdpi module. Error: $rmmod_output" >&2
+		echo "Module state:" >&2
+		lsmod | grep xdpi >&2
+		echo "Kernel messages:" >&2
+		dmesg | tail -n 20 | grep -i xdpi >&2
+		
+		# Show more detailed module information
+		echo "Detailed module information:" >&2
+		lsmod | grep xdpi >&2
+		echo "Module references:" >&2
+		cat /sys/module/xdpi_bpf/refcnt 2>/dev/null || echo "Cannot read refcnt" >&2
 		return 1
 	fi
 
-    return 0
+	# Verify module was actually unloaded
+	if lsmod | grep -q xdpi; then
+		echo "Module still loaded after rmmod attempt" >&2
+		return 1
+	fi
+
+	return 0
 }
 
 load_xdpi() {
