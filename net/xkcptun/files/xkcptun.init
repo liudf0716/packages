@@ -1,0 +1,106 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2025 Dengfeng Liu <liudf0716@gmail.com>
+#
+# This is free software, licensed under the GNU General Public License v3.
+# See /LICENSE for more information.
+#
+
+START=99
+USE_PROCD=1
+
+NAME=xkcp_client
+PROG=/usr/bin/$NAME
+
+handle_xkcptun() {
+    local section="$1"
+    local config="$2"
+
+    case "$section" in
+        common)
+            uci_validate_section xkcptun common common \
+                'localinterface:string' \
+                'localport:uinteger' \
+                'remoteaddr:host' \
+                'remoteport:uinteger' \
+                'key:string' \
+                'crypt:string' \
+                'mode:string' \
+                'mtu:uinteger' \
+                'sndwnd:uinteger' \
+                'rcvwnd:uinteger' \
+                'datashard:uinteger' \
+                'parityshard:uinteger' \
+                'dscp:uinteger' \
+                'nocomp:bool' \
+                'acknodelay:bool' \
+                'nodelay:uinteger' \
+                'interval:uinteger' \
+                'resend:uinteger' \
+                'nc:uinteger' \
+                'sockbuf:uinteger' \
+                'keepalive:uinteger'
+            ;;
+    esac
+
+    # Write the validated settings to the config file in JSON format
+    echo "{" >> "$config"
+    [ -z "$localinterface" ] || echo "  \"localinterface\": \"$localinterface\"," >> "$config"
+    [ -z "$localport" ] || echo "  \"localport\": $localport," >> "$config"
+    [ -z "$remoteaddr" ] || echo "  \"remoteaddr\": \"$remoteaddr\"," >> "$config"
+    [ -z "$remoteport" ] || echo "  \"remoteport\": $remoteport," >> "$config"
+    [ -z "$key" ] || echo "  \"key\": \"$key\"," >> "$config"
+    [ -z "$crypt" ] || echo "  \"crypt\": \"$crypt\"," >> "$config"
+    [ -z "$mode" ] || echo "  \"mode\": \"$mode\"," >> "$config"
+    [ -z "$mtu" ] || echo "  \"mtu\": $mtu," >> "$config"
+    [ -z "$sndwnd" ] || echo "  \"sndwnd\": $sndwnd," >> "$config"
+    [ -z "$rcvwnd" ] || echo "  \"rcvwnd\": $rcvwnd," >> "$config"
+    [ -z "$datashard" ] || echo "  \"datashard\": $datashard," >> "$config"
+    [ -z "$parityshard" ] || echo "  \"parityshard\": $parityshard," >> "$config"
+    [ -z "$dscp" ] || echo "  \"dscp\": $dscp," >> "$config"
+    [ -z "$nocomp" ] || echo "  \"nocomp\": $([ "$nocomp" = "1" ] && echo "true" || echo "false")," >> "$config"
+    [ -z "$acknodelay" ] || echo "  \"acknodelay\": $([ "$acknodelay" = "1" ] && echo "true" || echo "false")," >> "$config"
+    [ -z "$nodelay" ] || echo "  \"nodelay\": $nodelay," >> "$config"
+    [ -z "$interval" ] || echo "  \"interval\": $interval," >> "$config"
+    [ -z "$resend" ] || echo "  \"resend\": $resend," >> "$config"
+    [ -z "$nc" ] || echo "  \"nc\": $nc," >> "$config"
+    [ -z "$sockbuf" ] || echo "  \"sockbuf\": $sockbuf," >> "$config"
+    [ -z "$keepalive" ] || echo "  \"keepalive\": $keepalive" >> "$config"
+    echo "}" >> "$config"
+}
+
+service_triggers() {
+	procd_add_reload_trigger 'xkcptun'
+	procd_add_interface_trigger "interface.*.up" wan /etc/init.d/xkcptun restart
+}
+
+start_service() {
+	local conf_file="/var/etc/$NAME.json"
+
+	config_load "xkcptun"
+
+	uci_validate_section xkcptun common common \
+			'enabled:bool:0' \
+			'loglevel:uinteger:7'
+
+	if [ $enabled = 0 ]; then
+		echo "xkcptun service disabled"
+		return
+	fi
+
+	# Create empty config file
+	> "$conf_file"
+	
+	# Generate JSON config
+	config_foreach handle_xkcptun xkcptun "$conf_file"
+
+	procd_open_instance
+	procd_set_param command "$PROG" -c "$conf_file" -f -d "$loglevel"
+	procd_set_param file "$conf_file"
+	procd_set_param respawn
+	procd_close_instance
+}
+
+reload_service() {
+	stop
+	start
+}
