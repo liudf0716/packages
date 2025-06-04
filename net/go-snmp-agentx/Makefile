@@ -2,11 +2,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=go-snmp-agentx
 PKG_VERSION:=master
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/gigibox/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=6bb648c8d9faec4a5b6cf373afd20bc0e3c0ee62b2e1f4fed998a445daf89cf9
+PKG_HASH:=f31decb22c24de4fabfa685b6070a969fc17a791ae0055bad1f3359e359a451d
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
 
