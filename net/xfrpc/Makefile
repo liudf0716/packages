@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/xfrpc/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=3620a360d06e56cbb63b2cff247d7dc102bd39f203da5e88e803fd49b2b6b185
+PKG_HASH:=dccefbb7e3bff4057374704267cab0086353f1fc4d2c0b732edebbbf8d76fdee
 PKG_BUILD_DIR:=$(BUILD_DIR)/xfrpc-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
