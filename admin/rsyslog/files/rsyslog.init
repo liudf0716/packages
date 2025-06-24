@@ -18,6 +18,72 @@ BASE_CONFIG_FILE="/etc/rsyslog.conf"
 modules=""
 selectors=""
 forwarders=""
+tls_config=""
+remote_config=""
+
+handle_tls() {
+	local config="$1"
+	local enabled
+	local driver
+	local ca_file
+
+	config_get_bool enabled "${config}" enabled
+	if [ "${enabled}" -eq 1 ]; then
+		config_get driver "${config}" driver "ossl"
+		config_get ca_file "${config}" ca_file
+
+		# Add TLS network stream driver module based on driver type
+		if [ "${driver}" = "ossl" ]; then
+			if ! echo "${modules}" | grep -q "lmnsd_ossl"; then
+				modules="${modules} lmnsd_ossl"
+			fi
+		elif [ "${driver}" = "gtls" ]; then
+			if ! echo "${modules}" | grep -q "lmnsd_gtls"; then
+				modules="${modules} lmnsd_gtls"
+			fi
+		fi
+
+		# Use TLS configuration for anonymous authentication (client-side)
+		tls_config="# TLS/SSL Configuration for Anonymous Authentication
+global(
+	DefaultNetstreamDriver=\"${driver}\"
+	DefaultNetstreamDriverCAFile=\"${ca_file}\"
+)
+\$ActionSendStreamDriverAuthMode anon
+\$ActionSendStreamDriverMode 1"
+	fi
+}
+
+handle_remote_server() {
+	local config="$1"
+	local enabled
+	local server_ip
+	local server_port
+	local protocol
+	local use_tls
+	local source_selector
+
+	config_get_bool enabled "${config}" enabled
+	if [ "${enabled}" -eq 1 ]; then
+		config_get server_ip "${config}" server_ip
+		config_get server_port "${config}" server_port "6514"
+		config_get protocol "${config}" protocol "tcp"
+		config_get_bool use_tls "${config}" use_tls
+		config_get source_selector "${config}" source_selector "*.*"
+
+		if [ -n "${server_ip}" ]; then
+			if [ "${use_tls}" -eq 1 ]; then
+				remote_config="${source_selector} @@(o)${server_ip}:${server_port}"
+			else
+				if [ "${protocol}" = "tcp" ]; then
+					remote_config="${source_selector} @@${server_ip}:${server_port}"
+				else
+					remote_config="${source_selector} @${server_ip}:${server_port}"
+				fi
+			fi
+		fi
+	fi
+}
 
 handle_selector() {
 	local config="$1"
@@ -63,6 +129,9 @@ expand_config() {
 
 	config_load "${UCI_CONF}"
 	config_list_foreach syslog modules handle_module
+	config_foreach handle_tls tls_settings
+	config_foreach handle_remote_server remote_server
+	
 	config_get_bool tcp_input syslog tcp_input
 	if [ "${tcp_input}" -eq 1 ]; then
 		modules="${modules} imtcp"
@@ -88,11 +157,22 @@ expand_config() {
 	for m in ${modules}; do
 		echo "module(load=\"${m}\")" >> ${CONFIG_FILE}
 	done
+	
+	# Add TLS configuration if enabled
+	if [ -n "${tls_config}" ]; then
+		echo -e "${tls_config}" >> ${CONFIG_FILE}
+	fi
+	
 	echo "${input_t}" >> ${CONFIG_FILE}
 	echo "${input_u}" >> ${CONFIG_FILE}
 	echo "\$ActionFileDefaultTemplate ${template}" >> ${CONFIG_FILE}
 	echo -e "${selectors}" >> ${CONFIG_FILE}
 	echo -e "${forwarders}" >> ${CONFIG_FILE}
+	
+	# Add remote server configuration if enabled
+	if [ -n "${remote_config}" ]; then
+		echo "${remote_config}" >> ${CONFIG_FILE}
+	fi
 }
 
 handle_module() {

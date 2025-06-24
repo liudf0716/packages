@@ -13,6 +13,19 @@ config syslog 'syslog'
 	list modules 'imuxsock'
 	list modules 'imklog'
 
+config tls_settings 'tls'
+	option enabled '0'
+	option driver 'ossl'
+	option ca_file '/etc/ssl/certs/rsyslog-ca.pem'
+
+config remote_server 'remote'
+	option enabled '0'
+	option server_ip ''
+	option server_port '6514'
+	option protocol 'tcp'
+	option use_tls '0'
+	option source_selector '*.*'
+
 config selector
 	option source '*.info;mail.none;authpriv.none;cron.none'
 	option destination '/var/log/messages'

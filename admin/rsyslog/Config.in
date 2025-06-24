@@ -33,7 +33,8 @@ if PACKAGE_rsyslog
 		bool "Enable OpenSSL support"
 		default n
 		help
-		  Enable OpenSSL support in rsyslog
+		  Enable OpenSSL support in rsyslog. This includes TLS/SSL 
+		  capabilities for secure remote logging.
 	config RSYSLOG_gnutls
 		bool "Enable GnuTLS support"
 		default n
