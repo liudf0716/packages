@@ -234,6 +234,21 @@ prepare_common_settings() {
 	process_trusted_list "$trusted_wildcard_domains" "TrustedPanDomains"
 }
 
+prepare_device_info() {
+	# Check if any device info fields are set
+	if [ -n "$ap_device_id" ] || [ -n "$ap_mac_address" ] || [ -n "$ap_longitude" ] || [ -n "$ap_latitude" ] || [ -n "$location_id" ]; then
+		printf "DeviceInfo {\n" >> "$CONFIGFILE"
+		
+		[ -n "$ap_device_id" ] && printf "\tApDeviceId %s\n" "$ap_device_id" >> "$CONFIGFILE"
+		[ -n "$ap_mac_address" ] && printf "\tApMacAddress %s\n" "$ap_mac_address" >> "$CONFIGFILE"
+		[ -n "$ap_longitude" ] && printf "\tApLongitude %s\n" "$ap_longitude" >> "$CONFIGFILE"
+		[ -n "$ap_latitude" ] && printf "\tApLatitude %s\n" "$ap_latitude" >> "$CONFIGFILE"
+		[ -n "$location_id" ] && printf "\tLocationId %s\n" "$location_id" >> "$CONFIGFILE"
+		
+		printf "}\n" >> "$CONFIGFILE"
+	fi
+}
+
 prepare_auth_server_settings() {
 	case "$auth_server_mode" in
 	cloud|bypass)
@@ -320,7 +335,12 @@ prepare_wifidog_conf() {
 		'external_interface:string'	\
 		'enable_anti_nat:bool:0' \
 		'ttl_values:string:64,128' \
-		'anti_nat_permit_macs:string'
+		'anti_nat_permit_macs:string' \
+		'ap_device_id:string' \
+		'ap_mac_address:string' \
+		'ap_longitude:string' \
+		'ap_latitude:string' \
+		'location_id:string'
 
 	[ -n "$app_white_list" ] && add_white_list_entries "app_white_list" "domain_name" "trusted_domains"
 	[ -n "$mac_white_list" ] && add_white_list_entries "mac_white_list" "mac_address" "trusted_macs"
@@ -328,6 +348,7 @@ prepare_wifidog_conf() {
 
 	prepare_external_interface
 	prepare_auth_server_settings
+	prepare_device_info
 	config_foreach unload_aw_bpf gateway
 	reload_xdpi
 	config_foreach load_aw_bpf gateway
