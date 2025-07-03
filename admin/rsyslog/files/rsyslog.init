@@ -128,6 +128,12 @@ expand_config() {
 	local input_u=""
 
 	config_load "${UCI_CONF}"
+	# 新增：如果未启用，则跳过配置生成
+	config_get_bool enabled syslog enabled 0
+	if [ "${enabled}" -ne 1 ]; then
+		return
+	fi
+
 	config_list_foreach syslog modules handle_module
 	config_foreach handle_tls tls_settings
 	config_foreach handle_remote_server remote_server

@@ -5,6 +5,7 @@ grep -qv -e '^\s*#' -e '^\s*$' /etc/rsyslog.conf 2>/dev/null && exit 0
 
 uci -q import rsyslog << EOI
 config syslog 'syslog'
+	option enabled '0'
 	option tcp_input_port '514'
 	option udp_input '1'
 	option tcp_input '0'
