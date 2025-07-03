@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=a9353bc159e226f2de3b8e863fb045cfdf5d649ed3b2b8eec195bd5eeb69bb5c
+PKG_HASH:=61dd458c169ef4db05d68688d8a1889ae23eb8c21c14e8c4078b387475dbb5f3
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -54,7 +54,7 @@ define KernelPackage/xdpi
 endef
 
 define Build/Compile
-	$(call CompileBPF,$(PKG_BUILD_DIR)/ebpf/aw-bpf.c)
+	$(call CompileBPF,$(PKG_BUILD_DIR)/ebpf/aw-bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
 	$(KERNEL_MAKE) M="$(PKG_BUILD_DIR)/ebpf" modules
 endef
 
@@ -67,6 +67,7 @@ define Package/apfree-wifidog/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wifidogx $(1)/usr/bin/wifidogx
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wdctlx $(1)/usr/bin/wdctlx
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/aw-bpfctl $(1)/usr/bin/aw-bpfctl
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/event_daemon $(1)/usr/bin/event_daemon
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/wdping $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc
