@@ -336,6 +336,7 @@ prepare_wifidog_conf() {
 		'enable_anti_nat:bool:0' \
 		'ttl_values:string:64,128' \
 		'anti_nat_permit_macs:string' \
+		'enable_event_log:bool:0' \
 		'ap_device_id:string' \
 		'ap_mac_address:string' \
 		'ap_longitude:string' \
@@ -364,6 +365,23 @@ start_service() {
 	if [ "$enabled" -eq 0 ]; then
 		echo "wifidogx is disabled, exit..." >&2
 		return
+	fi
+
+	# Handle event logging daemon
+	# Stop existing event_daemon processes first
+	if pgrep -x event_daemon >/dev/null 2>&1; then
+		echo "Stopping existing event_daemon processes"
+		kill $(pgrep -x event_daemon) >/dev/null 2>&1
+	fi
+
+	# Start event daemon if enabled
+	if [ "$enable_event_log" -eq 1 ]; then
+		if command -v event_daemon >/dev/null 2>&1; then
+			echo "Starting event daemon"
+			event_daemon
+		else
+			echo "event_daemon not found, skipping event log" >&2
+		fi
 	fi
 
 	procd_open_instance
