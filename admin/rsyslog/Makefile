@@ -78,6 +78,8 @@ define Package/rsyslog/install
 	$(INSTALL_BIN) ./files/rsyslog-gen-certs.sh $(1)/usr/bin/
 	$(INSTALL_DIR) $(1)/usr/share/doc/rsyslog
 	$(INSTALL_DATA) ./files/TLS_README.md $(1)/usr/share/doc/rsyslog/
+	$(INSTALL_DIR) $(1)/etc/ssl/certs
+	$(INSTALL_DATA) ./files/rsyslog-ca.pem $(1)/etc/ssl/certs/
 endef
 
 define Package/rsyslog/config
