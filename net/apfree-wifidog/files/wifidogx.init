@@ -367,23 +367,6 @@ start_service() {
 		return
 	fi
 
-	# Handle event logging daemon
-	# Stop existing event_daemon processes first
-	if pgrep -x event_daemon >/dev/null 2>&1; then
-		echo "Stopping existing event_daemon processes"
-		kill $(pgrep -x event_daemon) >/dev/null 2>&1
-	fi
-
-	# Start event daemon if enabled
-	if [ "$enable_event_log" -eq 1 ]; then
-		if command -v event_daemon >/dev/null 2>&1; then
-			echo "Starting event daemon"
-			event_daemon
-		else
-			echo "event_daemon not found, skipping event log" >&2
-		fi
-	fi
-
 	procd_open_instance
 	procd_set_param command "$PROG" -c "$CONFIGFILE" -s -f -d "$log_level"
 	procd_set_param respawn

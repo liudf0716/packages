@@ -1,0 +1,45 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2018 Dengfeng Liu
+
+START=98
+USE_PROCD=1
+NAME=event_daemon
+PROG="/usr/bin/event_daemon"
+
+start_service() {
+	local enabled
+	
+	# Check if event_daemon binary exists first
+	if ! command -v "$PROG" >/dev/null 2>&1; then
+		echo "event_daemon binary not found" >&2
+		return 1
+	fi
+	
+	# Try to load wifidogx config, if it doesn't exist, assume enabled for now
+	# This allows event_daemon to start even if wifidogx hasn't been configured yet
+	if [ -f "/etc/config/wifidogx" ]; then
+		config_load wifidogx
+		config_get enabled common enable_event_log 1
+	else
+		enabled=1
+		echo "wifidogx config not found, assuming event logging enabled" >&2
+	fi
+	
+	if [ "$enabled" -eq 0 ]; then
+		echo "Event logging is disabled in wifidogx config" >&2
+		return
+	fi
+
+	echo "Starting event_daemon service" >&2
+	procd_open_instance
+	procd_set_param command "$PROG"
+	procd_set_param respawn
+	procd_set_param respawn_threshold 10
+	procd_set_param respawn_timeout 5
+	procd_set_param respawn_retry 5
+	procd_close_instance
+}
+
+service_triggers() {
+	procd_add_reload_trigger "wifidogx"
+}
