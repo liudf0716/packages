@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=e34e05da851f9e8d5f675ed390b38a2694b1d3576fbb5e10ec1587fa67f6e686
+PKG_HASH:=8609a3418837bea2118eb95a0122963699fc12963e4999b76eedde7f496cb45e
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -79,6 +79,7 @@ define Package/apfree-wifidog/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/internet-offline.html $(1)/etc/
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/wifidogx.init $(1)/etc/init.d/wifidogx
+	$(INSTALL_BIN) ./files/event_daemon.init $(1)/etc/init.d/event_daemon
 	$(INSTALL_DIR) $(1)/etc/config
 	$(CP) ./files/wifidogx.conf $(1)/etc/config/wifidogx
 	$(INSTALL_DIR) $(1)/etc/wifidogx
