@@ -7,35 +7,48 @@ NAME=wifidogx
 PROG="/usr/bin/${NAME}"
 CONFIGFILE="/tmp/wifidogx.conf"
 
-unload_aw_bpf() {
+unload_bpf_programs() {
 	local gateway_name="$1"
 	local iface
-	local bpf_file="/lib/bpf/aw-bpf.o"
-
+	
 	config_get gateway_name "$section" gateway_name
 	iface=$gateway_name
-	echo "unload_aw_bpf: $iface"
+	echo "unload_bpf_programs: $iface"
 
 	# Check if interface exists
 	[ -z "$iface" ] && return 1
 	[ ! -e "/sys/class/net/$iface" ] && return 1
 
-	# Check if BPF file exists
-	[ ! -f "$bpf_file" ] && return 1
-
-	# Clean up existing filters and qdisc
+	# Clean up existing filters and qdisc for this interface
 	tc qdisc show dev "$iface" | grep -q clsact && {
-		tc filter del dev "$iface" ingress 
-		tc filter del dev "$iface" egress 
-		tc qdisc del dev "$iface" clsact 
+		tc filter del dev "$iface" ingress 2>/dev/null || true
+		tc filter del dev "$iface" egress 2>/dev/null || true
+		tc qdisc del dev "$iface" clsact 2>/dev/null || true
 	}
 
+	return 0
+}
+
+# Global cleanup function for all BPF programs and maps
+unload_global_bpf_resources() {
+	echo "Cleaning up global BPF resources..."
+	
+	# Clean up DNS BPF programs loaded via bpftool
+	[ -e /sys/fs/bpf/tc/globals/dns_egress ] && rm -f /sys/fs/bpf/tc/globals/dns_egress
+
+	# Clean up aw-bpf maps (these are shared across all interfaces)
 	[ -e /sys/fs/bpf/tc/globals/ipv4_map ] && rm -f /sys/fs/bpf/tc/globals/ipv4_map
 	[ -e /sys/fs/bpf/tc/globals/ipv6_map ] && rm -f /sys/fs/bpf/tc/globals/ipv6_map
 	[ -e /sys/fs/bpf/tc/globals/mac_map ] && rm -f /sys/fs/bpf/tc/globals/mac_map
 	[ -e /sys/fs/bpf/tc/globals/tcp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/tcp_conn_map
 	[ -e /sys/fs/bpf/tc/globals/udp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/udp_conn_map
 	[ -e /sys/fs/bpf/tc/globals/xdpi_l7_map ] && rm -f /sys/fs/bpf/tc/globals/xdpi_l7_map
+	[ -e /sys/fs/bpf/tc/globals/session_events_map ] && rm -f /sys/fs/bpf/tc/globals/session_events_map
+	[ -e /sys/fs/bpf/tc/globals/prog_array_map ] && rm -f /sys/fs/bpf/tc/globals/prog_array_map
+
+	# Clean up dns-bpf maps
+	[ -e /sys/fs/bpf/tc/globals/dns_ringbuf ] && rm -f /sys/fs/bpf/tc/globals/dns_ringbuf
+	[ -e /sys/fs/bpf/tc/globals/dns_stats_map ] && rm -f /sys/fs/bpf/tc/globals/dns_stats_map
 
 	return 0
 }
@@ -119,30 +132,132 @@ reload_xdpi() {
 	return 0
 }
 
-load_aw_bpf() {
+load_dns_bpf_program() {
+	local dns_bpf_file="/lib/bpf/dns-bpf.o"
+	
+	# Load DNS BPF program globally (only once, not per interface)
+	if [ -f "$dns_bpf_file" ] && [ ! -e /sys/fs/bpf/tc/globals/dns_egress ]; then
+		# Create tc/globals directory if it doesn't exist
+		mkdir -p /sys/fs/bpf/tc/globals
+		
+		echo "Loading DNS BPF program from: $dns_bpf_file (global load)"
+		
+		# Wait a bit to ensure aw-bpf maps are properly created on first interface
+		sleep 2
+		
+		# Load DNS egress handler via bpftool with better error handling
+		local dns_prog_id
+		local load_output
+		load_output=$(bpftool prog load "$dns_bpf_file" /sys/fs/bpf/tc/globals/dns_egress type classifier 2>&1)
+		local load_status=$?
+		
+		if [ $load_status -eq 0 ]; then
+			echo "DNS BPF program loaded successfully"
+			
+			# Pin maps to the correct location (/sys/fs/bpf/tc/globals/)
+			sleep 1  # Wait for maps to be created
+			
+			# Move dns_ringbuf to correct location
+			if [ -e /sys/fs/bpf/dns_ringbuf ] && [ ! -e /sys/fs/bpf/tc/globals/dns_ringbuf ]; then
+				bpftool map pin name dns_ringbuf /sys/fs/bpf/tc/globals/dns_ringbuf 2>/dev/null && \
+				rm -f /sys/fs/bpf/dns_ringbuf
+				echo "dns_ringbuf pinned to /sys/fs/bpf/tc/globals/"
+			fi
+			
+			# Move dns_stats_map to correct location  
+			if [ -e /sys/fs/bpf/dns_stats_map ] && [ ! -e /sys/fs/bpf/tc/globals/dns_stats_map ]; then
+				bpftool map pin name dns_stats_map /sys/fs/bpf/tc/globals/dns_stats_map 2>/dev/null && \
+				rm -f /sys/fs/bpf/dns_stats_map
+				echo "dns_stats_map pinned to /sys/fs/bpf/tc/globals/"
+			fi
+			
+			# Get program ID using multiple methods
+			dns_prog_id=$(bpftool prog show name dns_handler_egress 2>/dev/null | head -1 | cut -d: -f1)
+			
+			if [ -z "$dns_prog_id" ]; then
+				# Alternative method: get from pinned program
+				dns_prog_id=$(bpftool prog show pinned /sys/fs/bpf/tc/globals/dns_egress 2>/dev/null | head -1 | cut -d: -f1)
+			fi
+			
+			if [ -z "$dns_prog_id" ]; then
+				# Last resort: parse from load output if available
+				dns_prog_id=$(echo "$load_output" | grep -o 'id [0-9]*' | cut -d' ' -f2)
+			fi
+		else
+			echo "Failed to load DNS BPF program. Error: $load_output" >&2
+			return 1
+		fi
+		
+		if [ -n "$dns_prog_id" ] && [ "$dns_prog_id" -gt 0 ] 2>/dev/null; then
+			echo "dns-bpf egress program loaded with ID: $dns_prog_id (pinned to /sys/fs/bpf/tc/globals/dns_egress)"
+			
+			# Wait for maps to be created
+			sleep 1
+			
+			# Setup tail call in prog_array_map (index 0 for DNS egress) if available
+			if bpftool map show name prog_array_map >/dev/null 2>&1 || bpftool map show pinned /sys/fs/bpf/tc/globals/prog_array_map >/dev/null 2>&1; then
+				echo "Adding DNS program (ID: $dns_prog_id) to prog_array_map"
+				
+				# Try both name and pinned path with correct format
+				# For prog_array maps, key should be byte array format and value should be "id <program_id>"
+				if bpftool map update name prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null || \
+				   bpftool map update pinned /sys/fs/bpf/tc/globals/prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null; then
+					echo "DNS egress program (ID: $dns_prog_id) added to prog_array_map at index 0"
+				else
+					echo "Failed to add DNS program to prog_array_map" >&2
+				fi
+			else
+				echo "prog_array_map not found. DNS program loaded but tail call not configured." >&2
+				echo "DNS program will work independently without tail call integration." >&2
+			fi
+		else
+			echo "Failed to load dns-bpf program or get valid program ID (got: '$dns_prog_id')" >&2
+			# Show more debug info
+			echo "Available BPF programs:" >&2
+			bpftool prog list 2>/dev/null | grep -E "(classifier|dns)" || echo "No relevant programs found"
+			return 1
+		fi
+	elif [ -f "$dns_bpf_file" ] && [ -e /sys/fs/bpf/tc/globals/dns_egress ]; then
+		echo "DNS BPF program already loaded (pinned at /sys/fs/bpf/tc/globals/dns_egress)"
+	else
+		echo "dns-bpf.o not found at $dns_bpf_file, skipping DNS program loading" >&2
+	fi
+	
+	return 0
+}
+
+load_bpf_programs() {
 	local gateway_name="$1"
 	local iface
-	local bpf_file="/lib/bpf/aw-bpf.o"
+	local aw_bpf_file="/lib/bpf/aw-bpf.o"
 
 	config_get gateway_name "$section" gateway_name
 	iface=$gateway_name
+	echo "load_bpf_programs: $iface"
 
 	# Check if interface exists
 	[ -z "$iface" ] && return 1
 	[ ! -e "/sys/class/net/$iface" ] && return 1
 
-	# Check if BPF file exists
-	[ ! -f "$bpf_file" ] && return 1
+	# Add clsact qdisc
+	tc qdisc add dev "$iface" clsact 2>/dev/null || true
 
-	# Add new filters
-	tc qdisc add dev "$iface" clsact 2>/dev/null
-	if [ $? -eq 0 ]; then
-		tc filter add dev "$iface" ingress prio 1 bpf da obj "$bpf_file" sec tc/ingress 
-		tc filter add dev "$iface" egress prio 1 bpf da obj "$bpf_file" sec tc/egress 
-		return 0
+	# Load main aw-bpf.o program via TC if available (per interface)
+	if [ -f "$aw_bpf_file" ]; then
+		tc filter add dev "$iface" ingress prio 1 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/dev/null
+		tc filter add dev "$iface" egress prio 1 bpf da obj "$aw_bpf_file" sec tc/egress 2>/dev/null
+		if [ $? -eq 0 ]; then
+			echo "aw-bpf loaded successfully on $iface"
+		else
+			echo "Failed to load aw-bpf on $iface" >&2
+			return 1
+		fi
+	else
+		echo "aw-bpf.o not found, skipping" >&2
+		return 1
 	fi
 
-	return 1
+	return 0
 }
 
 handle_gateway() {
@@ -231,7 +346,7 @@ prepare_common_settings() {
 
 	process_trusted_list "$trusted_domains" "TrustedDomains"
 	process_trusted_list "$trusted_macs" "TrustedMACList"
-	process_trusted_list "$trusted_wildcard_domains" "TrustedPanDomains"
+	process_trusted_list "$trusted_wildcard_domains" "TrustedWildcardDomains"
 }
 
 prepare_device_info() {
@@ -350,9 +465,11 @@ prepare_wifidog_conf() {
 	prepare_external_interface
 	prepare_auth_server_settings
 	prepare_device_info
-	config_foreach unload_aw_bpf gateway
+	unload_global_bpf_resources
+	config_foreach unload_bpf_programs gateway
 	reload_xdpi
-	config_foreach load_aw_bpf gateway
+	config_foreach load_bpf_programs gateway
+	load_dns_bpf_program
 	config_foreach handle_gateway gateway
 	prepare_common_settings
 }
