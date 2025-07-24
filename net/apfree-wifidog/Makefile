@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=8609a3418837bea2118eb95a0122963699fc12963e4999b76eedde7f496cb45e
+PKG_HASH:=70b53e264794e60519bedaffa43a0efe8116563a7420845672e6526cf38deaf8
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -55,6 +55,7 @@ endef
 
 define Build/Compile
 	$(call CompileBPF,$(PKG_BUILD_DIR)/ebpf/aw-bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
+	$(call CompileBPF,$(PKG_BUILD_DIR)/ebpf/dns-bpf.c)
 	$(KERNEL_MAKE) M="$(PKG_BUILD_DIR)/ebpf" modules
 endef
 
@@ -68,6 +69,7 @@ define Package/apfree-wifidog/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wdctlx $(1)/usr/bin/wdctlx
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/aw-bpfctl $(1)/usr/bin/aw-bpfctl
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/event_daemon $(1)/usr/bin/event_daemon
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/dns-monitor $(1)/usr/bin/dns-monitor
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./files/wdping $(1)/usr/sbin/
 	$(INSTALL_DIR) $(1)/etc
@@ -88,6 +90,7 @@ define Package/apfree-wifidog/install
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/wifi-diag $(1)/www/cgi-bin/
 	$(INSTALL_DIR) $(1)/lib/bpf
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/ebpf/aw-bpf.o $(1)/lib/bpf
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/ebpf/dns-bpf.o $(1)/lib/bpf
 endef
 
 $(eval $(call BuildPackage,apfree-wifidog))
