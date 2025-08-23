@@ -365,6 +365,62 @@ prepare_device_info() {
 }
 
 prepare_auth_server_settings() {
+	# 获取选中的认证服务器配置
+	local selected_auth_server
+	selected_auth_server=$(uci get wifidogx.common.selected_auth_server 2>/dev/null)
+	
+	# 如果是云认证或旁路模式，需要验证选中的认证服务器
+	if [ "$auth_server_mode" = "cloud" ] || [ "$auth_server_mode" = "bypass" ]; then
+		if [ -z "$selected_auth_server" ]; then
+			echo "Error: selected_auth_server is required for $auth_server_mode mode" >&2
+			return 1
+		fi
+		
+		# 获取选中认证服务器的配置
+		local auth_hostname auth_port auth_path long_conn_mode
+		local ws_hostname ws_port ws_path mqtt_hostname mqtt_port mqtt_username mqtt_password
+		
+		auth_hostname=$(uci get wifidogx."$selected_auth_server".auth_server_hostname 2>/dev/null)
+		auth_port=$(uci get wifidogx."$selected_auth_server".auth_server_port 2>/dev/null)
+		auth_path=$(uci get wifidogx."$selected_auth_server".auth_server_path 2>/dev/null)
+		long_conn_mode=$(uci get wifidogx."$selected_auth_server".long_conn_mode 2>/dev/null)
+		ws_hostname=$(uci get wifidogx."$selected_auth_server".ws_server_hostname 2>/dev/null)
+		ws_port=$(uci get wifidogx."$selected_auth_server".ws_server_port 2>/dev/null)
+		ws_path=$(uci get wifidogx."$selected_auth_server".ws_server_path 2>/dev/null)
+		mqtt_hostname=$(uci get wifidogx."$selected_auth_server".mqtt_server_hostname 2>/dev/null)
+		mqtt_port=$(uci get wifidogx."$selected_auth_server".mqtt_server_port 2>/dev/null)
+		mqtt_username=$(uci get wifidogx."$selected_auth_server".mqtt_username 2>/dev/null)
+		mqtt_password=$(uci get wifidogx."$selected_auth_server".mqtt_password 2>/dev/null)
+		
+		# 使用获取到的配置值，如果为空则使用默认值
+		auth_server_hostname="${auth_hostname:-192.168.1.1}"
+		auth_server_port="${auth_port:-80}"
+		auth_server_path="${auth_path:-/wifidog/}"
+		long_conn_mode="${long_conn_mode:-none}"
+		
+		# 如果 WebSocket 配置为空，使用认证服务器配置作为默认值
+		ws_hostname="${ws_hostname:-$auth_hostname}"
+		ws_port="${ws_port:-$auth_port}"
+		ws_path="${ws_path:-/ws/wifidogx}"
+		
+		# 如果 MQTT 配置为空，使用认证服务器配置作为默认值
+		mqtt_hostname="${mqtt_hostname:-$auth_hostname}"
+		mqtt_port="${mqtt_port:-1883}"
+		
+		# 将配置导出为全局变量，以便后续使用
+		export auth_server_hostname
+		export auth_server_port
+		export auth_server_path
+		export long_conn_mode
+		export ws_hostname
+		export ws_port
+		export ws_path
+		export mqtt_hostname
+		export mqtt_port
+		export mqtt_username
+		export mqtt_password
+	fi
+	
 	case "$auth_server_mode" in
 	cloud|bypass)
 		printf "AuthServerMode 0\n" >> "$CONFIGFILE"
@@ -372,15 +428,11 @@ prepare_auth_server_settings() {
 			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE" 
 		case "$long_conn_mode" in
 		ws|wss)
-			ws_hostname="${ws_server_hostname:-$auth_server_hostname}"
-			ws_port="${ws_server_port:-$auth_server_port}"
 			ws_ssl=$([ "$long_conn_mode" = "wss" ] && echo 1 || echo 0)
 			printf "WebSocket {\n\tWSServer %s\n\tWSServerPort %s\n\tWSServerPath %s\n\tWSServerSSL %s\n}\n" \
-				"$ws_hostname" "$ws_port" "$ws_server_path" "$ws_ssl" >> "$CONFIGFILE"
+				"$ws_hostname" "$ws_port" "$ws_path" "$ws_ssl" >> "$CONFIGFILE"
 			;;
 		mqtt)
-			mqtt_hostname="${mqtt_server_hostname:-$auth_server_hostname}"
-			mqtt_port="${mqtt_server_port:-1883}"
 			printf "MQTT {\n\tMQTTHost %s\n\tMQTTPort %s\n\tMQTTUsername %s\n\tMQTTPassword %s\n}\n" \
 				"$mqtt_hostname" "$mqtt_port" "${mqtt_username:-}" "${mqtt_password:-}" >> "$CONFIGFILE"
 			;;
@@ -415,10 +467,45 @@ prepare_wifidog_conf() {
 	[ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
 	local long_conn_mode_value='"ws", "wss", "mqtt", "none"'
 	local auth_server_mode_value='"cloud", "bypass", "local"'
+	
+	# 获取选中的认证服务器
+	local selected_auth_server
+	selected_auth_server=$(uci get wifidogx.common.selected_auth_server 2>/dev/null)
+	
+	# 如果是云认证或旁路模式，从选中的认证服务器获取配置
+	if [ "$auth_server_mode" = "cloud" ] || [ "$auth_server_mode" = "bypass" ]; then
+		if [ -n "$selected_auth_server" ]; then
+			# 声明为全局变量，以便 prepare_auth_server_settings 函数可以访问
+			export auth_server_hostname
+			export auth_server_port
+			export auth_server_path
+			export long_conn_mode
+			export ws_server_hostname
+			export ws_server_port
+			export ws_server_path
+			export mqtt_server_hostname
+			export mqtt_server_port
+			export mqtt_username
+			export mqtt_password
+			
+			auth_server_hostname=$(uci get wifidogx."$selected_auth_server".auth_server_hostname 2>/dev/null)
+			auth_server_port=$(uci get wifidogx."$selected_auth_server".auth_server_port 2>/dev/null)
+			auth_server_path=$(uci get wifidogx."$selected_auth_server".auth_server_path 2>/dev/null)
+			long_conn_mode=$(uci get wifidogx."$selected_auth_server".long_conn_mode 2>/dev/null)
+			ws_server_hostname=$(uci get wifidogx."$selected_auth_server".ws_server_hostname 2>/dev/null)
+			ws_server_port=$(uci get wifidogx."$selected_auth_server".ws_server_port 2>/dev/null)
+			ws_server_path=$(uci get wifidogx."$selected_auth_server".ws_server_path 2>/dev/null)
+			mqtt_server_hostname=$(uci get wifidogx."$selected_auth_server".mqtt_server_hostname 2>/dev/null)
+			mqtt_server_port=$(uci get wifidogx."$selected_auth_server".mqtt_server_port 2>/dev/null)
+			mqtt_username=$(uci get wifidogx."$selected_auth_server".mqtt_username 2>/dev/null)
+			mqtt_password=$(uci get wifidogx."$selected_auth_server".mqtt_password 2>/dev/null)
+		fi
+	fi
     
 	uci_validate_section "$NAME" "$NAME" common \
 		'enabled:bool:0' \
 		"auth_server_mode:or($auth_server_mode_value)" \
+		'selected_auth_server:string' \
 		'log_level:integer:7' \
 		'device_id:string' \
 		'auth_server_hostname:string' \
