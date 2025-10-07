@@ -329,6 +329,7 @@ prepare_common_settings() {
 	
 	printf "EnableAntiNat %s\n" "$enable_anti_nat" >> "$CONFIGFILE"
 	printf "TTLValues %s\n" "$ttl_values" >> "$CONFIGFILE"
+	printf "DisablePortalAuth %s\n" "$disable_portal_auth" >> "$CONFIGFILE"
 
 	[ -n "$anti_nat_permit_macs" ] && printf "AntiNatPermitMACs %s\n" "$anti_nat_permit_macs" >> "$CONFIGFILE"
 	
@@ -538,6 +539,7 @@ prepare_wifidog_conf() {
 		'ttl_values:string:64,128' \
 		'anti_nat_permit_macs:string' \
 		'enable_event_log:bool:0' \
+		'disable_portal_auth:bool:1' \
 		'ap_device_id:string' \
 		'ap_mac_address:string' \
 		'ap_longitude:string' \
