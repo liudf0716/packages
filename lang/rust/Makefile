@@ -85,6 +85,10 @@ define Host/Uninstall
 endef
 
 define Host/Compile
+	# Rust 1.89.0 configure generates bootstrap.toml but x.py expects config.toml
+	[ -f $(HOST_BUILD_DIR)/bootstrap.toml ] && \
+		[ ! -f $(HOST_BUILD_DIR)/config.toml ] && \
+		ln -sf bootstrap.toml $(HOST_BUILD_DIR)/config.toml || true
 	$(RUST_SCCACHE_VARS) \
 	CARGO_HOME=$(CARGO_HOME) \
 	TARGET_CFLAGS="$(TARGET_CFLAGS)" \
