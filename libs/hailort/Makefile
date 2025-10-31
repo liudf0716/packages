@@ -20,7 +20,6 @@ PKG_FIXUP:=cmake
 HOST_BUILD_DEPENDS:=ninja/host
 PKG_INSTALL:=1
 
-
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 
@@ -48,18 +47,35 @@ CMAKE_OPTIONS += \
 	-DBUILD_TESTING=OFF \
 	-DCMAKE_GENERATOR="Ninja"
 
-define Package/hailort/install
+# Override Build/Install to ensure DESTDIR is correct
+define Build/Install
+	DESTDIR="$(PKG_INSTALL_DIR)" $(NINJA) -C $(PKG_BUILD_DIR)/build install
+endef
+
+# Development files install (for building TAPPAS)
+define Build/InstallDev
+	$(INSTALL_DIR) $(1)/usr/include/hailo
+	$(CP) -r $(PKG_INSTALL_DIR)/usr/include/hailo/* $(1)/usr/include/hailo/
+
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libhailort.so* $(1)/usr/lib/
 
-	$(INSTALL_DIR) $(1)/usr/include/hailo
-	$(CP) $(PKG_INSTALL_DIR)/usr/include/hailo/* $(1)/usr/include/hailo/
+	$(INSTALL_DIR) $(1)/usr/lib/cmake/HailoRT
+	$(CP) -r $(PKG_INSTALL_DIR)/usr/lib/cmake/HailoRT/* $(1)/usr/lib/cmake/HailoRT/
+endef
 
+define Package/hailort/install
+	# Libraries
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libhailort.so* $(1)/usr/lib/
+
+	# CLI tool
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/hailortcli $(1)/usr/bin/
 
+	# CMake configuration
 	$(INSTALL_DIR) $(1)/usr/lib/cmake/HailoRT
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/cmake/HailoRT/* $(1)/usr/lib/cmake/HailoRT/
+	$(CP) -r $(PKG_INSTALL_DIR)/usr/lib/cmake/HailoRT/* $(1)/usr/lib/cmake/HailoRT/
 endef
 
 $(eval $(call BuildPackage,hailort))
