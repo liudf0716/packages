@@ -27,6 +27,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/xtensor
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=xtensor - C++ tensors with broadcasting and lazy computing
   URL:=https://github.com/xtensor-stack/xtensor
   DEPENDS:=+xtl
