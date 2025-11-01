@@ -27,6 +27,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/xtl
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=xtl - Basic tools (containers, algorithms) used by xtensor
   URL:=https://github.com/xtensor-stack/xtl
   BUILDONLY:=1

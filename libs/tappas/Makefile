@@ -28,12 +28,13 @@ TARGET_CXXFLAGS += -Wno-error=class-memaccess -Wno-error=deprecated-declarations
 define Package/tappas
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=Hailo TAPPAS - Video Processing Pipeline Framework
   URL:=https://github.com/hailo-ai/tappas
   DEPENDS:=+libstdcpp +libpthread +hailort \
            +gstreamer1 +gst1-plugins-base \
            +opencv +libopencv-core +libopencv-imgproc +libopencv-imgcodecs \
-           +xtensor +xtl +rapidjson +libzmq-nc +cppzmq
+           +libzmq-nc
 endef
 
 define Package/tappas/description

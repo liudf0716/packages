@@ -29,6 +29,7 @@ CMAKE_BINARY_DIR:=$(PKG_BUILD_DIR)/build
 define Package/hailort
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=Hailo-8 Runtime library
   URL:=https://github.com/hailo-ai/hailort
   DEPENDS:=+libstdcpp +libpthread +zlib +libyaml +libusb-1.0

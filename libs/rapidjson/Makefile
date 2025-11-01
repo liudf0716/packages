@@ -27,6 +27,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/rapidjson
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=rapidjson - Fast JSON parser/generator for C++
   URL:=https://github.com/Tencent/rapidjson
   BUILDONLY:=1

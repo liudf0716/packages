@@ -28,6 +28,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/opencv/Default
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=OpenCV - Open Source Computer Vision Library
   URL:=https://opencv.org/
   DEPENDS:=+libstdcpp +libpthread +zlib +libjpeg +libpng

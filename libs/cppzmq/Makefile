@@ -27,6 +27,7 @@ include $(INCLUDE_DIR)/cmake.mk
 define Package/cppzmq
   SECTION:=libs
   CATEGORY:=Libraries
+  SUBMENU:=Hailo
   TITLE:=cppzmq - C++ binding for ZeroMQ
   URL:=https://github.com/zeromq/cppzmq
   DEPENDS:=+libzmq-nc
