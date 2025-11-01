@@ -52,14 +52,16 @@ define Build/Install
 	DESTDIR="$(PKG_INSTALL_DIR)" $(NINJA) -C $(PKG_BUILD_DIR)/build install
 endef
 
-# Development files install (for building TAPPAS)
 define Build/InstallDev
-	$(INSTALL_DIR) $(1)/usr/include/hailo
-	$(CP) -r $(PKG_INSTALL_DIR)/usr/include/hailo/* $(1)/usr/include/hailo/
-
+	$(INSTALL_DIR) $(1)/usr/include
+	$(CP) -r $(PKG_INSTALL_DIR)/usr/include/hailo $(1)/usr/include/
+	# Install GStreamer bindings headers for tappas
+	$(INSTALL_DIR) $(1)/usr/include/gst-hailo/metadata
+	$(CP) $(PKG_BUILD_DIR)/hailort/libhailort/bindings/gstreamer/gst-hailo/metadata/*.hpp $(1)/usr/include/gst-hailo/metadata/ 2>/dev/null || true
+	$(INSTALL_DIR) $(1)/usr/include/gst-hailo/include
+	$(CP) $(PKG_BUILD_DIR)/hailort/libhailort/bindings/gstreamer/gst-hailo/include/*.h $(1)/usr/include/gst-hailo/include/ 2>/dev/null || true
 	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libhailort.so* $(1)/usr/lib/
-
 	$(INSTALL_DIR) $(1)/usr/lib/cmake/HailoRT
 	$(CP) -r $(PKG_INSTALL_DIR)/usr/lib/cmake/HailoRT/* $(1)/usr/lib/cmake/HailoRT/
 endef
@@ -76,6 +78,10 @@ define Package/hailort/install
 	# CMake configuration
 	$(INSTALL_DIR) $(1)/usr/lib/cmake/HailoRT
 	$(CP) -r $(PKG_INSTALL_DIR)/usr/lib/cmake/HailoRT/* $(1)/usr/lib/cmake/HailoRT/
+
+	# Development files
+	$(INSTALL_DIR) $(1)/usr/include/hailo
+	$(CP) -r $(PKG_INSTALL_DIR)/usr/include/hailo/* $(1)/usr/include/hailo/
 endef
 
 $(eval $(call BuildPackage,hailort))
