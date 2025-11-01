@@ -1,0 +1,12 @@
+--- a/include/rapidjson/document.h
++++ b/include/rapidjson/document.h
+@@ -316,7 +316,9 @@ struct GenericStringRef {
+ 
+     GenericStringRef(const GenericStringRef& rhs) : s(rhs.s), length(rhs.length) {}
+ 
+-    GenericStringRef& operator=(const GenericStringRef& rhs) { s = rhs.s; length = rhs.length; }
++    GenericStringRef& operator=(const GenericStringRef& rhs) {
++        return *const_cast<GenericStringRef*>(this) = GenericStringRef(rhs.s, rhs.length);
++    }
+ 
+     operator const Ch *() const { return s; }
