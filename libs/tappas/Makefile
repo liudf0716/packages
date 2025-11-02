@@ -34,7 +34,8 @@ define Package/tappas
   DEPENDS:=+libstdcpp +libpthread +hailort \
            +gstreamer1 +gst1-plugins-base \
            +opencv +libopencv-core +libopencv-imgproc +libopencv-imgcodecs \
-           +libzmq-nc
+           +libzmq-nc \
+           +xtl +xtensor +rapidjson +cppzmq
 endef
 
 define Package/tappas/description

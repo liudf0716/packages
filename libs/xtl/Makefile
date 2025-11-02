@@ -30,7 +30,6 @@ define Package/xtl
   SUBMENU:=Hailo
   TITLE:=xtl - Basic tools (containers, algorithms) used by xtensor
   URL:=https://github.com/xtensor-stack/xtl
-  BUILDONLY:=1
 endef
 
 define Package/xtl/description

@@ -31,7 +31,6 @@ define Package/cppzmq
   TITLE:=cppzmq - C++ binding for ZeroMQ
   URL:=https://github.com/zeromq/cppzmq
   DEPENDS:=+libzmq-nc
-  BUILDONLY:=1
 endef
 
 define Package/cppzmq/description
