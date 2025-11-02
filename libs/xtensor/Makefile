@@ -61,4 +61,9 @@ define Build/InstallDev
 	$(CP) $(PKG_INSTALL_DIR)/usr/share/pkgconfig/xtensor.pc $(1)/usr/lib/pkgconfig/
 endef
 
+define Package/xtensor/install
+	# Header-only library, no runtime files to install
+	true
+endef
+
 $(eval $(call BuildPackage,xtensor))
