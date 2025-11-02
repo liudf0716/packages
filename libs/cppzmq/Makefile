@@ -51,4 +51,9 @@ define Build/InstallDev
 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/cmake/cppzmq/* $(1)/usr/share/cmake/cppzmq/ 2>/dev/null || true
 endef
 
+define Package/cppzmq/install
+	# Header-only library, no runtime files to install
+	true
+endef
+
 $(eval $(call BuildPackage,cppzmq))

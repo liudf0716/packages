@@ -51,4 +51,9 @@ define Build/InstallDev
 	$(CP) $(PKG_INSTALL_DIR)/usr/share/pkgconfig/xtl.pc $(1)/usr/lib/pkgconfig/
 endef
 
+define Package/xtl/install
+	# Header-only library, no runtime files to install
+	true
+endef
+
 $(eval $(call BuildPackage,xtl))
