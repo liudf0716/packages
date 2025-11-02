@@ -31,7 +31,6 @@ define Package/xtensor
   TITLE:=xtensor - C++ tensors with broadcasting and lazy computing
   URL:=https://github.com/xtensor-stack/xtensor
   DEPENDS:=+xtl
-  BUILDONLY:=1
 endef
 
 define Package/xtensor/description
