@@ -40,8 +40,8 @@ define Package/dockerd
     +DOCKER_IPTABLES:iptables-mod-extra \
     +!DOCKER_IPTABLES:nftables \
     +!DOCKER_IPTABLES:kmod-nft-core \
+    +!DOCKER_IPTABLES:kmod-nft-nat \
     +IPV6:DOCKER_IPTABLES:ip6tables-nft \
-    +IPV6:!DOCKER_IPTABLES:kmod-nft-inet \
     +IPV6:kmod-ipt-nat6 \
     +KERNEL_SECCOMP:libseccomp \
     +kmod-ipt-nat \
