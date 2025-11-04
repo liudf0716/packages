@@ -1,15 +1,15 @@
 config DOCKER_IPTABLES
-bool "Enable iptables mode (compatibility)"
-default n
-help
-  Enable iptables-based networking for Docker.
-  
-  If disabled (recommended), Docker will use native
-  nftables support which works better with OpenWrt
-  23.05+ and firewall4.
-  
-  Only enable for compatibility with older systems.
+	bool "Enable iptables mode (compatibility)"
+	default n
+	help
+	  Enable iptables-based networking for Docker.
+	  
+	  If disabled (recommended), Docker will use native
+	  nftables support which works better with OpenWrt
+	  23.05+ and firewall4.
+	  
+	  Only enable for compatibility with older systems.
 
 config DOCKER_CHECK_CONFIG
-bool "Include docker check-config.sh"
-default n
+	bool "Include docker check-config.sh"
+	default n
