@@ -38,10 +38,10 @@ define Package/dockerd
     +containerd \
     +DOCKER_IPTABLES:iptables-nft \
     +DOCKER_IPTABLES:iptables-mod-extra \
+    +(DOCKER_IPTABLES&&IPV6):ip6tables-nft \
     +!DOCKER_IPTABLES:nftables \
     +!DOCKER_IPTABLES:kmod-nft-core \
     +!DOCKER_IPTABLES:kmod-nft-nat \
-    +IPV6:DOCKER_IPTABLES:ip6tables-nft \
     +IPV6:kmod-ipt-nat6 \
     +KERNEL_SECCOMP:libseccomp \
     +kmod-ipt-nat \
