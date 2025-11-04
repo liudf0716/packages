@@ -171,7 +171,7 @@ process_config() {
 
 	config_get data_root globals data_root "/opt/docker/"
 	config_get log_level globals log_level "warn"
-	config_get_bool iptables globals iptables "1"
+	config_get_bool iptables globals iptables "0"
 	config_get_bool ip6tables globals ip6tables "0"
 
 	# Don't add these options by default
@@ -227,8 +227,27 @@ process_config() {
 
 start_service() {
 	local nofile=$(cat /proc/sys/fs/nr_open)
+	local iptables_enabled
 
 	process_config
+	
+	# Check and warn about firewall compatibility
+	config_load 'dockerd'
+	config_get_bool iptables_enabled globals iptables "0"
+	
+	if [ "${iptables_enabled}" -eq "1" ]; then
+		# iptables mode enabled
+		if [ -x /sbin/fw4 ] && ! command -v iptables-legacy >/dev/null 2>&1; then
+			logger -t "dockerd" -p warn "Docker iptables mode may not work with firewall4/nftables"
+			logger -t "dockerd" -p warn "Consider disabling 'option iptables' in /etc/config/dockerd"
+		fi
+	else
+		# nftables mode (default)
+		if ! command -v nft >/dev/null 2>&1; then
+			logger -t "dockerd" -p warn "nftables not found, Docker networking may not work properly"
+			logger -t "dockerd" -p warn "Install nftables: opkg install nftables kmod-nft-core"
+		fi
+	fi
 
 	procd_open_instance
 	procd_set_param stderr 1

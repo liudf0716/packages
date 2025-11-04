@@ -36,9 +36,12 @@ define Package/dockerd
   DEPENDS:=$(GO_ARCH_DEPENDS) \
     +ca-certificates \
     +containerd \
-    +iptables \
-    +iptables-mod-extra \
-    +IPV6:ip6tables \
+    +DOCKER_IPTABLES:iptables-nft \
+    +DOCKER_IPTABLES:iptables-mod-extra \
+    +!DOCKER_IPTABLES:nftables \
+    +!DOCKER_IPTABLES:kmod-nft-core \
+    +IPV6:DOCKER_IPTABLES:ip6tables-nft \
+    +IPV6:!DOCKER_IPTABLES:kmod-nft-inet \
     +IPV6:kmod-ipt-nat6 \
     +KERNEL_SECCOMP:libseccomp \
     +kmod-ipt-nat \
