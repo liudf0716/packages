@@ -587,12 +587,3 @@ reload_service() {
 	stop
 	start
 }
-
-service_triggers() {
-	procd_add_reload_trigger "wifidogx" "firewall"
-	procd_add_interface_trigger "interface.*.up" "wan" /etc/init.d/wifidogx reload
-	procd_add_interface_trigger "interface.*.up" "wan6" /etc/init.d/wifidogx reload
-	procd_add_interface_trigger "interface.*.up" "wwan" /etc/init.d/wifidogx reload
-	procd_add_interface_trigger "interface.*.up" "wwan6" /etc/init.d/wifidogx reload
-	procd_add_interface_trigger "interface.*.up" "lan" /etc/init.d/wifidogx reload
-}
