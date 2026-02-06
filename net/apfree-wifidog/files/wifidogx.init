@@ -515,6 +515,10 @@ prepare_wifidog_conf() {
 	prepare_common_settings
 }
 
+service_triggers() {
+	procd_add_reload_trigger "wifidogx"
+}
+
 start_service() {
 	config_load "$NAME"
 
