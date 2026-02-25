@@ -132,99 +132,7 @@ reload_xdpi() {
 	return 0
 }
 
-load_dns_bpf_program() {
-	local dns_bpf_file="/lib/bpf/dns-bpf.o"
-	
-	# Load DNS BPF program globally (only once, not per interface)
-	if [ -f "$dns_bpf_file" ] && [ ! -e /sys/fs/bpf/tc/globals/dns_egress ]; then
-		# Create tc/globals directory if it doesn't exist
-		mkdir -p /sys/fs/bpf/tc/globals
-		
-		echo "Loading DNS BPF program from: $dns_bpf_file (global load)"
-		
-		# Wait a bit to ensure aw-bpf maps are properly created on first interface
-		sleep 2
-		
-		# Load DNS egress handler via bpftool with better error handling
-		local dns_prog_id
-		local load_output
-		load_output=$(bpftool prog load "$dns_bpf_file" /sys/fs/bpf/tc/globals/dns_egress type classifier 2>&1)
-		local load_status=$?
-		
-		if [ $load_status -eq 0 ]; then
-			echo "DNS BPF program loaded successfully"
-			
-			# Pin maps to the correct location (/sys/fs/bpf/tc/globals/)
-			sleep 1  # Wait for maps to be created
-			
-			# Move dns_ringbuf to correct location
-			if [ -e /sys/fs/bpf/dns_ringbuf ] && [ ! -e /sys/fs/bpf/tc/globals/dns_ringbuf ]; then
-				bpftool map pin name dns_ringbuf /sys/fs/bpf/tc/globals/dns_ringbuf 2>/dev/null && \
-				rm -f /sys/fs/bpf/dns_ringbuf
-				echo "dns_ringbuf pinned to /sys/fs/bpf/tc/globals/"
-			fi
-			
-			# Move dns_stats_map to correct location  
-			if [ -e /sys/fs/bpf/dns_stats_map ] && [ ! -e /sys/fs/bpf/tc/globals/dns_stats_map ]; then
-				bpftool map pin name dns_stats_map /sys/fs/bpf/tc/globals/dns_stats_map 2>/dev/null && \
-				rm -f /sys/fs/bpf/dns_stats_map
-				echo "dns_stats_map pinned to /sys/fs/bpf/tc/globals/"
-			fi
-			
-			# Get program ID using multiple methods
-			dns_prog_id=$(bpftool prog show name dns_handler_egress 2>/dev/null | head -1 | cut -d: -f1)
-			
-			if [ -z "$dns_prog_id" ]; then
-				# Alternative method: get from pinned program
-				dns_prog_id=$(bpftool prog show pinned /sys/fs/bpf/tc/globals/dns_egress 2>/dev/null | head -1 | cut -d: -f1)
-			fi
-			
-			if [ -z "$dns_prog_id" ]; then
-				# Last resort: parse from load output if available
-				dns_prog_id=$(echo "$load_output" | grep -o 'id [0-9]*' | cut -d' ' -f2)
-			fi
-		else
-			echo "Failed to load DNS BPF program. Error: $load_output" >&2
-			return 1
-		fi
-		
-		if [ -n "$dns_prog_id" ] && [ "$dns_prog_id" -gt 0 ] 2>/dev/null; then
-			echo "dns-bpf egress program loaded with ID: $dns_prog_id (pinned to /sys/fs/bpf/tc/globals/dns_egress)"
-			
-			# Wait for maps to be created
-			sleep 1
-			
-			# Setup tail call in prog_array_map (index 0 for DNS egress) if available
-			if bpftool map show name prog_array_map >/dev/null 2>&1 || bpftool map show pinned /sys/fs/bpf/tc/globals/prog_array_map >/dev/null 2>&1; then
-				echo "Adding DNS program (ID: $dns_prog_id) to prog_array_map"
-				
-				# Try both name and pinned path with correct format
-				# For prog_array maps, key should be byte array format and value should be "id <program_id>"
-				if bpftool map update name prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null || \
-				   bpftool map update pinned /sys/fs/bpf/tc/globals/prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null; then
-					echo "DNS egress program (ID: $dns_prog_id) added to prog_array_map at index 0"
-				else
-					echo "Failed to add DNS program to prog_array_map" >&2
-				fi
-			else
-				echo "prog_array_map not found. DNS program loaded but tail call not configured." >&2
-				echo "DNS program will work independently without tail call integration." >&2
-			fi
-		else
-			echo "Failed to load dns-bpf program or get valid program ID (got: '$dns_prog_id')" >&2
-			# Show more debug info
-			echo "Available BPF programs:" >&2
-			bpftool prog list 2>/dev/null | grep -E "(classifier|dns)" || echo "No relevant programs found"
-			return 1
-		fi
-	elif [ -f "$dns_bpf_file" ] && [ -e /sys/fs/bpf/tc/globals/dns_egress ]; then
-		echo "DNS BPF program already loaded (pinned at /sys/fs/bpf/tc/globals/dns_egress)"
-	else
-		echo "dns-bpf.o not found at $dns_bpf_file, skipping DNS program loading" >&2
-	fi
-	
-	return 0
-}
+
 
 load_bpf_programs() {
 	local gateway_name="$1"
@@ -510,7 +418,6 @@ prepare_wifidog_conf() {
 	config_foreach unload_bpf_programs gateway
 	reload_xdpi
 	config_foreach load_bpf_programs gateway
-	load_dns_bpf_program
 	config_foreach handle_gateway gateway
 	prepare_common_settings
 }
