@@ -8,7 +8,7 @@ PKG_RELEASE:=1
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/bpfilter/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=2adffbe52b424c3915961a31066e24e235347e0e14d6705454a6f5de94aaf2ef
+PKG_HASH:=b3a587678fbbacba115cc33f2729722a6f06b852b09aadb292d6b4c963c1daa7
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 # Build configuration
@@ -21,6 +21,13 @@ HOST_BUILD_DEPENDS:=HOST_OS_MACOS:argp-standalone/host
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
+
+# Disable tests, docs, checks, and benchmarks for OpenWrt
+CMAKE_OPTIONS += \
+	-DNO_TESTS=1 \
+	-DNO_DOCS=1 \
+	-DNO_CHECKS=1 \
+	-DNO_BENCHMARKS=1
 
 define Package/bpfilter
   SECTION:=net
@@ -43,8 +50,10 @@ endef
 # Install files to OpenWrt's root filesystem
 define Package/bpfilter/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/output/bin/bpfilter $(1)/usr/sbin/
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/output/bin/bfcli $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/output/sbin/bpfilter $(1)/usr/sbin/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/output/sbin/bfcli $(1)/usr/sbin/
+	$(INSTALL_DIR) $(1)/usr/lib
+	$(CP) $(PKG_BUILD_DIR)/output/lib/libbpfilter.so* $(1)/usr/lib/
 endef
 
 # Register the package

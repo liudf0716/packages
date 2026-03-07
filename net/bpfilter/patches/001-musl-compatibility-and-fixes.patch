@@ -1,0 +1,182 @@
+diff -ruN a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	2026-02-26 02:33:40.000000000 +0800
++++ b/CMakeLists.txt	2026-02-26 17:59:48.363675252 +0800
+@@ -5,6 +5,11 @@
+ 
+ if (NOT DEFINED DEFAULT_PROJECT_VERSION)
+     set(DEFAULT_PROJECT_VERSION 0.0.0)
++
++option(NO_TESTS "Disable tests" ON)
++option(NO_DOCS "Disable docs" ON)
++option(NO_CHECKS "Disable checks" ON)
++option(NO_BENCHMARKS "Disable benchmarks" ON)
+ endif ()
+ 
+ project(bpfilter
+diff -ruN a/src/bfcli/CMakeLists.txt b/src/bfcli/CMakeLists.txt
+--- a/src/bfcli/CMakeLists.txt	2026-02-26 02:33:40.000000000 +0800
++++ b/src/bfcli/CMakeLists.txt	2026-02-26 17:59:48.359675263 +0800
+@@ -75,6 +75,7 @@
+     PRIVATE
+         bf_global_flags
+         libbpfilter
++        argp
+ )
+ 
+ install(TARGETS bfcli
+diff -ruN a/src/bfcli/opts.c b/src/bfcli/opts.c
+--- a/src/bfcli/opts.c	2026-02-26 02:33:40.000000000 +0800
++++ b/src/bfcli/opts.c	2026-02-26 17:59:48.347675297 +0800
+@@ -6,6 +6,7 @@
+ #include "opts.h"
+ 
+ #include <argp.h>
++#include <limits.h>
+ 
+ #include <bpfilter/helper.h>
+ 
+diff -ruN a/src/bfcli/print.c b/src/bfcli/print.c
+--- a/src/bfcli/print.c	2026-02-26 02:33:40.000000000 +0800
++++ b/src/bfcli/print.c	2026-02-26 17:59:48.347675297 +0800
+@@ -13,6 +13,7 @@
+ #include <linux/ipv6.h>
+ #include <linux/tcp.h>
+ #include <linux/udp.h>
++#include <endian.h>
+ 
+ #include <errno.h>
+ #include <stdbool.h>
+diff -ruN a/src/bpfilter/CMakeLists.txt b/src/bpfilter/CMakeLists.txt
+--- a/src/bpfilter/CMakeLists.txt	2026-02-26 02:33:40.000000000 +0800
++++ b/src/bpfilter/CMakeLists.txt	2026-02-26 17:59:48.359675263 +0800
+@@ -83,6 +83,7 @@
+         bf_global_flags
+         libbpfilter
+         PkgConfig::nl
++        argp
+ )
+ 
+ install(TARGETS bpfilter
+diff -ruN a/src/bpfilter/cgen/elfstub.c b/src/bpfilter/cgen/elfstub.c
+--- a/src/bpfilter/cgen/elfstub.c	2026-02-26 02:33:40.000000000 +0800
++++ b/src/bpfilter/cgen/elfstub.c	2026-02-26 17:59:48.351675286 +0800
+@@ -8,6 +8,12 @@
+ #include <linux/bpf.h>
+ 
+ #include <elf.h>
++#ifndef R_BPF_64_64
++#define R_BPF_64_64 1
++#endif
++#ifndef R_BPF_64_32
++#define R_BPF_64_32 10
++#endif
+ #include <errno.h>
+ 
+ #include <bpfilter/btf.h>
+diff -ruN a/src/libbpfilter/include/bpfilter/helper.h b/src/libbpfilter/include/bpfilter/helper.h
+--- a/src/libbpfilter/include/bpfilter/helper.h	2026-02-26 02:33:40.000000000 +0800
++++ b/src/libbpfilter/include/bpfilter/helper.h	2026-02-26 17:59:48.355675274 +0800
+@@ -13,7 +13,6 @@
+ #include <string.h>
+ #include <strings.h>
+ 
+-extern const char *strerrordesc_np(int errnum);
+ 
+ #define _BF_APPLY0(t, s, dummy)
+ #define _BF_APPLY1(t, s, a) t(a)
+@@ -185,7 +184,7 @@
+  *
+  * @param v Error code, can be positive or negative.
+  */
+-#define bf_strerror(v) strerrordesc_np(abs(v))
++#define bf_strerror(v) strerror(abs(v))
+ 
+ /**
+  * Swap two values.
+diff -ruN a/tools/cmake/ElfStubs.cmake b/tools/cmake/ElfStubs.cmake
+--- a/tools/cmake/ElfStubs.cmake	2026-02-26 02:33:40.000000000 +0800
++++ b/tools/cmake/ElfStubs.cmake	2026-02-26 17:59:48.347675297 +0800
+@@ -1,30 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ # Copyright (c) 2023 Meta Platforms, Inc. and affiliates.
+ 
+-# - Compile stub BPF programs to be integrated into a target
+-#
+-# This function performs a multi-steps process to compile BPF programs and
+-# make them available to a C binary:
+-#   1. Compile the C BPF programs into an ELF file using clang.
+-#   2. Use xxd to generate a C source file containing two symbols: an array of
+-#      bytes defining the ELF file, and an integer to define its length.
+-#   3. Generate a header file declaring an array of custom structures
+-#      representing all the ELF stubs available.
+-#
+-# Each generated C source file is added to the target as a dependency *but not
+-# compiled*. The generated header in step 3 will include those header files
+-# directly.
+-#
+-# Params:
+-#   - TARGET: name of the target to define stubs for.
+-#   - DIR: directory containing the source files for the stubs.
+-#   - SYM_PREFIX: prefix of the C symbols.
+-#   - DECL_HDR_PATH: path to the generated header file. The caller is
+-#     responsible for adding the containing directory to the list of include
+-#     directory for the taret.
+-#   - STUBS: list of strings defining the name of the stubs sources.
+-#     bf_target_add_elfstubs() will look for the stubs following the pattern:
+-#     ${DIR}/${STUB_NAME}.bpf.c.
+ function(bf_target_add_elfstubs TARGET)
+     cmake_parse_arguments(PARSE_ARGV 1 _LOCAL
+         ""
+@@ -59,49 +35,28 @@
+                     -I ${CMAKE_SOURCE_DIR}/src/external/include
+                     -c ${_LOCAL_DIR}/${_stub}.bpf.c
+                     -o ${ELFSTUBS_ELF_DIR}/${_stub}.o
+-            COMMAND
+-                ${XXD_BIN}
+-                    -i
+-                    ${ELFSTUBS_ELF_DIR}/${_stub}.o
+-                    ${ELFSTUBS_INC_DIR}/${_stub}.inc.c
+-            # The following sed commands will perform two operations:
+-            # - Ensure the symbols defined are static const
+-            # - Name the symbols as ${_LOCAL_SYM_PREFIX}/${_stub}(_len). This can be
+-            #   done using `xxd -n` but it's not supported on EPEL9.
+-            COMMAND
+-                ${SED_BIN}
+-                    -i 's/^unsigned char .*\\[\\]/static const unsigned char ${_LOCAL_SYM_PREFIX}${_stub}\\[\\]/'
+-                    ${ELFSTUBS_INC_DIR}/${_stub}.inc.c
+-            COMMAND
+-                ${SED_BIN}
+-                    -i 's/^unsigned int .*_len \\=/static const unsigned int ${_LOCAL_SYM_PREFIX}${_stub}_len \\=/'
+-                    ${ELFSTUBS_INC_DIR}/${_stub}.inc.c
++            COMMAND ${CMAKE_COMMAND} -E make_directory ${ELFSTUBS_INC_DIR}
++            COMMAND /bin/sh -c "${XXD_BIN} -i ${ELFSTUBS_ELF_DIR}/${_stub}.o > ${ELFSTUBS_INC_DIR}/${_stub}.inc.c && ${SED_BIN} -i 's/^unsigned char .* = {/static const unsigned char ${_LOCAL_SYM_PREFIX}${_stub}[] = {/' ${ELFSTUBS_INC_DIR}/${_stub}.inc.c && ${SED_BIN} -i 's/^unsigned int .*_len =/static const unsigned int ${_LOCAL_SYM_PREFIX}${_stub}_len =/' ${ELFSTUBS_INC_DIR}/${_stub}.inc.c"
+             DEPENDS
+                 ${_LOCAL_DIR}/${_stub}.bpf.c
+                 ${DECL_TEMPLATE_PATH}
+             OUTPUT
+                 ${ELFSTUBS_INC_DIR}/${_stub}.inc.c
+             COMMENT "Generate ${_stub} stub"
++            VERBATIM
+         )
+ 
+         set(HDR_INC "${HDR_INC}#include \"${_stub}.inc.c\"\n")
+         set(HDR_DECL "${HDR_DECL}{ .elf = ${_LOCAL_SYM_PREFIX}${_stub}, .len = ${_LOCAL_SYM_PREFIX}${_stub}_len, },\n")
+ 
+-        # Add the source file containing the ELF file to the sources of the
+-        # given target, so the target will be build when the stub changes. It
+-        # will be included in the generated private header, so it should be
+-        # marked as header file.
+         target_sources(${TARGET} PRIVATE ${ELFSTUBS_INC_DIR}/${_stub}.inc.c)
+         set_source_files_properties(${ELFSTUBS_INC_DIR}/${_stub}.inc.c
+             PROPERTIES
+                 HEADER_FILE_ONLY ON
+         )
+-
+-        message(VERBOSE "  - ${_stub}")
+     endforeach()
+ 
+     configure_file(${DECL_TEMPLATE_PATH} ${_LOCAL_DECL_HDR_PATH} @ONLY)
+     target_sources(${TARGET} PRIVATE ${_LOCAL_DECL_HDR_PATH})
+-
+     target_include_directories(${TARGET} PRIVATE ${ELFSTUBS_INC_DIR})
+ endfunction()
