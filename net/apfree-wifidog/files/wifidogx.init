@@ -276,7 +276,7 @@ prepare_device_info() {
 prepare_auth_server_settings() {
 	# 获取选中的认证服务器配置
 	local selected_auth_server
-	local long_conn_mode_value='"ws", "wss", "mqtt", "none"'
+	local long_conn_mode_value='"ws", "wss", "mqtt", "mqtts", "none"'
 	selected_auth_server=$(uci get wifidogx.common.selected_auth_server 2>/dev/null)
 	
 	# 如果是云认证或旁路模式，需要验证选中的认证服务器
@@ -308,7 +308,7 @@ prepare_auth_server_settings() {
 		[ -n "$ws_server_path" ] || ws_server_path="/ws/wifidogx"
 		
 		[ -n "$mqtt_server_hostname" ] || mqtt_server_hostname="$auth_server_hostname"
-		[ -n "$mqtt_server_port" ] || mqtt_server_port="1883"
+		[ -n "$mqtt_server_port" ] || mqtt_server_port="$long_conn_mode" == "mqtt" ? "1883" : "8883"
 		
 		export auth_server_hostname
 		export auth_server_port
