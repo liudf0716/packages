@@ -288,7 +288,7 @@ prepare_auth_server_settings() {
 		
 		local auth_server_hostname auth_server_port auth_server_path long_conn_mode
 		local ws_server_hostname ws_server_port ws_server_path
-		local mqtt_server_hostname mqtt_server_port mqtt_username mqtt_password
+		local mqtt_server_hostname mqtt_server_port mqtt_username mqtt_password mqtt_use_ssl
 		
 		uci_validate_section "$NAME" "auth" "$selected_auth_server" \
 			'auth_server_hostname:string:192.168.1.1' \
@@ -308,7 +308,7 @@ prepare_auth_server_settings() {
 		[ -n "$ws_server_path" ] || ws_server_path="/ws/wifidogx"
 		
 		[ -n "$mqtt_server_hostname" ] || mqtt_server_hostname="$auth_server_hostname"
-		[ -n "$mqtt_server_port" ] || mqtt_server_port="$long_conn_mode" == "mqtt" ? "1883" : "8883"
+		[ -n "$mqtt_server_port" ] || mqtt_server_port=$([ "$long_conn_mode" = "mqtt" ] && echo "1883" || echo "8883")
 		
 		export auth_server_hostname
 		export auth_server_port
@@ -334,9 +334,10 @@ prepare_auth_server_settings() {
 			printf "WebSocket {\n\tWSServer %s\n\tWSServerPort %s\n\tWSServerPath %s\n\tWSServerSSL %s\n}\n" \
 				"$ws_server_hostname" "$ws_server_port" "$ws_server_path" "$ws_ssl" >> "$CONFIGFILE"
 			;;
-		mqtt)
-			printf "mqtt {\n\tserveraddr %s\n\tserverport %s\n\tmqttUsername %s\n\tmqttPassword %s\n}\n" \
-				"$mqtt_server_hostname" "$mqtt_server_port" "${mqtt_username:-}" "${mqtt_password:-}" >> "$CONFIGFILE"
+		mqtt|mqtts)
+			mqtt_ssl=$([ "$long_conn_mode" = "mqtts" ] && echo 1 || echo 0)
+			printf "mqtt {\n\tserveraddr %s\n\tserverport %s\n\tmqttUseSSL %s\n\tmqttUsername %s\n\tmqttPassword %s\n}\n" \
+				"$mqtt_server_hostname" "$mqtt_server_port" "$mqtt_ssl" "${mqtt_username:-}" "${mqtt_password:-}" >> "$CONFIGFILE"
 			;;
 		esac
 			;;
