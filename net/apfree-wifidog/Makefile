@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=61ef8deffb6b6fb48346caa8321c5e2c2d7c0d53b9f18b63f33dba8947bbfaab
+PKG_HASH:=118f8e22b768451c8e8d0c7daee6192c0f1e7177de57c43cb4a58c1faec7a372
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
