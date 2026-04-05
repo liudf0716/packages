@@ -50,6 +50,8 @@ define Package/clawwrt/install
 	$(INSTALL_BIN) ./files/clawwrt.init $(1)/etc/init.d/clawwrt
 	$(INSTALL_DIR) $(1)/etc/config
 	$(CP) ./files/clawwrt.conf $(1)/etc/config/clawwrt
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/clawwrt.defaults $(1)/etc/uci-defaults/99_clawwrt
 endef
 
 $(eval $(call GoBinPackage,clawwrt))
