@@ -29,7 +29,7 @@ define Package/apfree-wifidog
   CATEGORY:=Network
   DEPENDS:=+zlib +libjson-c +libevent2 +libevent2-openssl +libuci \
   			+openssl-util +libnetfilter-queue +conntrack +libmosquitto \
-			+libnftnl +libmnl +aw-bpf
+			+libnftnl +libmnl
   TITLE:=Apfree's wireless captive portal solution
   URL:=https://github.com/liudf0716/apfree_wifidog
 endef
