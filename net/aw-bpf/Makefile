@@ -13,7 +13,7 @@ PKG_RELEASE:=1
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=skip
+PKG_HASH:=6f40619f51a7a9926c257a86650a561f730fb4d1a367d8cfed6687b6f0b03289
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -36,23 +36,32 @@ define Package/aw-bpf
 endef
 
 define Package/aw-bpf/description
-  ApFree eBPF provides eBPF programs for session tracking, xDPI, DNS monitoring
-  and related user-space tools (aw-bpfctl, event_daemon, dns-monitor).
+	ApFree eBPF provides eBPF programs for session tracking, xDPI, DNS monitoring
+	and related user-space tools (aw-bpfctl, event_daemon).
+endef
+
+
+define KernelPackage/xdpi
+  SECTION:=kernel
+  SUBMENU:=Network Support
+  TITLE:=xdpi ebpf module
+  FILES:=$(PKG_BUILD_DIR)/xdpi-bpf.ko
+  AUTOLOAD:=$(call AutoProbe,xdpi)
+endef
+
+define Build/Compile
+	$(call CompileBPF,$(PKG_BUILD_DIR)/aw-bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
+	$(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
 endef
 
 define Package/aw-bpf/conffiles
 /etc/config/aw-bpf
 endef
 
-define Build/Compile
-	cd $(PKG_BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=Release . && make -j$(CPU_COUNT)
-endef
-
 define Package/aw-bpf/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/aw-bpfctl $(1)/usr/bin/aw-bpfctl
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/event_daemon $(1)/usr/bin/event_daemon
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/dns-monitor $(1)/usr/bin/dns-monitor
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/aw-bpf.init $(1)/etc/init.d/aw-bpf
 	$(INSTALL_DIR) $(1)/etc/config
@@ -62,3 +71,4 @@ define Package/aw-bpf/install
 endef
 
 $(eval $(call BuildPackage,aw-bpf))
+$(eval $(call KernelPackage,xdpi))
