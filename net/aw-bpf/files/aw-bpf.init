@@ -1,0 +1,103 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2025 Dengfeng Liu
+# aw-bpf service - manages aw-bpf lifecycle: event_daemon, xdpi module, BPF maps
+
+START=98
+USE_PROCD=1
+NAME=aw-bpf
+PROG="/usr/bin/event_daemon"
+
+# Global cleanup function for all BPF programs and maps
+cleanup_bpf_resources() {
+	echo "Cleaning up global BPF resources..." >&2
+	
+	# Clean up DNS BPF programs loaded via bpftool
+	[ -e /sys/fs/bpf/tc/globals/dns_egress ] && rm -f /sys/fs/bpf/tc/globals/dns_egress
+
+	# Clean up aw-bpf maps (these are shared across all interfaces)
+	[ -e /sys/fs/bpf/tc/globals/ipv4_map ] && rm -f /sys/fs/bpf/tc/globals/ipv4_map
+	[ -e /sys/fs/bpf/tc/globals/ipv6_map ] && rm -f /sys/fs/bpf/tc/globals/ipv6_map
+	[ -e /sys/fs/bpf/tc/globals/mac_map ] && rm -f /sys/fs/bpf/tc/globals/mac_map
+	[ -e /sys/fs/bpf/tc/globals/tcp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/tcp_conn_map
+	[ -e /sys/fs/bpf/tc/globals/udp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/udp_conn_map
+	[ -e /sys/fs/bpf/tc/globals/xdpi_l7_map ] && rm -f /sys/fs/bpf/tc/globals/xdpi_l7_map
+	[ -e /sys/fs/bpf/tc/globals/session_events_map ] && rm -f /sys/fs/bpf/tc/globals/session_events_map
+	[ -e /sys/fs/bpf/tc/globals/prog_array_map ] && rm -f /sys/fs/bpf/tc/globals/prog_array_map
+
+	# Clean up dns-bpf maps
+	[ -e /sys/fs/bpf/tc/globals/dns_ringbuf ] && rm -f /sys/fs/bpf/tc/globals/dns_ringbuf
+	[ -e /sys/fs/bpf/tc/globals/dns_stats_map ] && rm -f /sys/fs/bpf/tc/globals/dns_stats_map
+
+	return 0
+}
+
+unload_xdpi() {
+	# check if xdpi-bpf module is loaded
+	if ! lsmod | grep -q xdpi; then
+		echo "xdpi module not loaded" >&2
+		return 0
+	fi
+
+	# Try to unload the module and capture any error messages
+	local rmmod_output
+	rmmod_output=$(rmmod xdpi-bpf 2>&1)
+	local rmmod_status=$?
+
+	if [ $rmmod_status -ne 0 ]; then
+		echo "Note: Failed to unload xdpi module (may still be in use). Error: $rmmod_output" >&2
+		return 0
+	fi
+
+	# Verify module was actually unloaded
+	if lsmod | grep -q xdpi; then
+		echo "Note: Module still loaded after rmmod attempt" >&2
+		return 0
+	fi
+
+	echo "xdpi module unloaded successfully" >&2
+	return 0
+}
+
+start_service() {
+	local enable_event_log
+	
+	# Check if event_daemon binary exists first
+	if ! command -v "$PROG" >/dev/null 2>&1; then
+		echo "event_daemon binary not found" >&2
+		return 1
+	fi
+	
+	# Load aw-bpf config (independent from wifidogx)
+	config_load aw-bpf
+	config_get enable_event_log common enable_event_log 0
+	
+	if [ "$enable_event_log" -eq 0 ]; then
+		echo "Event logging is disabled in aw-bpf config" >&2
+		return
+	fi
+
+	echo "Starting aw-bpf service (event_daemon)" >&2
+	procd_open_instance
+	procd_set_param command "$PROG"
+	procd_set_param respawn
+	procd_set_param respawn_threshold 10
+	procd_set_param respawn_timeout 5
+	procd_set_param respawn_retry 5
+	procd_close_instance
+}
+
+stop_service() {
+	echo "Stopping aw-bpf service..." >&2
+	
+	# First unload xdpi module if loaded
+	unload_xdpi
+	
+	# Then cleanup BPF resources
+	cleanup_bpf_resources
+	
+	echo "aw-bpf cleanup completed" >&2
+}
+
+service_triggers() {
+	procd_add_reload_trigger "aw-bpf"
+}
