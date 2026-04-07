@@ -29,112 +29,10 @@ unload_bpf_programs() {
 	return 0
 }
 
-# Global cleanup function for all BPF programs and maps
-unload_global_bpf_resources() {
-	echo "Cleaning up global BPF resources..."
-	
-	# Clean up DNS BPF programs loaded via bpftool
-	[ -e /sys/fs/bpf/tc/globals/dns_egress ] && rm -f /sys/fs/bpf/tc/globals/dns_egress
+# Global cleanup function for all BPF programs and maps moved to aw-bpf package
+# Each interface's tc filters are cleaned up in unload_bpf_programs()
 
-	# Clean up aw-bpf maps (these are shared across all interfaces)
-	[ -e /sys/fs/bpf/tc/globals/ipv4_map ] && rm -f /sys/fs/bpf/tc/globals/ipv4_map
-	[ -e /sys/fs/bpf/tc/globals/ipv6_map ] && rm -f /sys/fs/bpf/tc/globals/ipv6_map
-	[ -e /sys/fs/bpf/tc/globals/mac_map ] && rm -f /sys/fs/bpf/tc/globals/mac_map
-	[ -e /sys/fs/bpf/tc/globals/tcp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/tcp_conn_map
-	[ -e /sys/fs/bpf/tc/globals/udp_conn_map ] && rm -f /sys/fs/bpf/tc/globals/udp_conn_map
-	[ -e /sys/fs/bpf/tc/globals/xdpi_l7_map ] && rm -f /sys/fs/bpf/tc/globals/xdpi_l7_map
-	[ -e /sys/fs/bpf/tc/globals/session_events_map ] && rm -f /sys/fs/bpf/tc/globals/session_events_map
-	[ -e /sys/fs/bpf/tc/globals/prog_array_map ] && rm -f /sys/fs/bpf/tc/globals/prog_array_map
-
-	# Clean up dns-bpf maps
-	[ -e /sys/fs/bpf/tc/globals/dns_ringbuf ] && rm -f /sys/fs/bpf/tc/globals/dns_ringbuf
-	[ -e /sys/fs/bpf/tc/globals/dns_stats_map ] && rm -f /sys/fs/bpf/tc/globals/dns_stats_map
-
-	return 0
-}
-
-unload_xdpi() {
-	# check if xdpi-bpf module is loaded
-	if ! lsmod | grep -q xdpi; then
-		echo "xdpi module not loaded" >&2
-		return 0
-	fi
-
-	# Get module dependencies before unloading
-	echo "Module dependencies before unloading:" >&2
-	lsmod | grep xdpi >&2
-
-	# Try to unload dependent modules first
-	local dependent_modules
-	dependent_modules=$(lsmod | grep xdpi | awk '{print $4}' | tr ',' '\n' | grep -v '^$')
-	if [ -n "$dependent_modules" ]; then
-		echo "Attempting to unload dependent modules:" >&2
-		for module in $dependent_modules; do
-			echo "Unloading dependent module: $module" >&2
-			rmmod "$module" 2>/dev/null
-		done
-	fi
-
-	# Try to unload the module and capture any error messages
-	local rmmod_output
-	rmmod_output=$(rmmod xdpi-bpf 2>&1)
-	local rmmod_status=$?
-
-	if [ $rmmod_status -ne 0 ]; then
-		echo "Failed to unload xdpi module. Error: $rmmod_output" >&2
-		echo "Module state:" >&2
-		lsmod | grep xdpi >&2
-		echo "Kernel messages:" >&2
-		dmesg | tail -n 20 | grep -i xdpi >&2
-		
-		# Show more detailed module information
-		echo "Detailed module information:" >&2
-		lsmod | grep xdpi >&2
-		echo "Module references:" >&2
-		cat /sys/module/xdpi_bpf/refcnt 2>/dev/null || echo "Cannot read refcnt" >&2
-		return 1
-	fi
-
-	# Verify module was actually unloaded
-	if lsmod | grep -q xdpi; then
-		echo "Module still loaded after rmmod attempt" >&2
-		return 1
-	fi
-
-	return 0
-}
-
-load_xdpi() {
-	# Load xdpi-bpf module if not loaded
-	if ! lsmod | grep -q xdpi; then
-		modprobe xdpi-bpf
-		if [ $? -ne 0 ]; then
-			echo "Failed to load xdpi module" >&2
-			return 1
-		fi
-	fi
-
-	return 0
-}
-
-reload_xdpi() {
-	# Unload and reload xdpi-bpf module
-	unload_xdpi
-	load_xdpi
-	
-	# Check if xdpi-bpf module is loaded
-	if ! lsmod | grep -q xdpi; then
-		echo "xdpi module not loaded" >&2
-		
-		return 1
-	fi
-
-	return 0
-}
-
-
-
-load_bpf_programs() {
+unload_bpf_programs() {
 	local gateway_name="$1"
 	local iface
 	local aw_bpf_file="/lib/bpf/aw-bpf.o"
@@ -410,7 +308,6 @@ prepare_wifidog_conf() {
 		'enable_anti_nat:bool:0' \
 		'ttl_values:string:64,128' \
 		'anti_nat_permit_macs:string' \
-		'enable_event_log:bool:0' \
 		'disable_portal_auth:bool:1' \
 		'ap_device_id:string' \
 		'ap_mac_address:string' \
@@ -426,9 +323,7 @@ prepare_wifidog_conf() {
 	prepare_auth_server_settings
 	prepare_longconn_settings
 	prepare_device_info
-	unload_global_bpf_resources
 	config_foreach unload_bpf_programs gateway
-	reload_xdpi
 	config_foreach load_bpf_programs gateway
 	config_foreach handle_gateway gateway
 	prepare_common_settings
