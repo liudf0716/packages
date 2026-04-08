@@ -7,65 +7,6 @@ NAME=wifidogx
 PROG="/usr/bin/${NAME}"
 CONFIGFILE="/tmp/wifidogx.conf"
 
-unload_bpf_programs() {
-	local gateway_name="$1"
-	local iface
-	
-	config_get gateway_name "$section" gateway_name
-	iface=$gateway_name
-	echo "unload_bpf_programs: $iface"
-
-	# Check if interface exists
-	[ -z "$iface" ] && return 1
-	[ ! -e "/sys/class/net/$iface" ] && return 1
-
-	# Clean up existing filters and qdisc for this interface
-	tc qdisc show dev "$iface" | grep -q clsact && {
-		tc filter del dev "$iface" ingress 2>/dev/null || true
-		tc filter del dev "$iface" egress 2>/dev/null || true
-		tc qdisc del dev "$iface" clsact 2>/dev/null || true
-	}
-
-	return 0
-}
-
-# Global cleanup function for all BPF programs and maps moved to aw-bpf package
-# Each interface's tc filters are cleaned up in unload_bpf_programs()
-
-unload_bpf_programs() {
-	local gateway_name="$1"
-	local iface
-	local aw_bpf_file="/lib/bpf/aw-bpf.o"
-
-	config_get gateway_name "$section" gateway_name
-	iface=$gateway_name
-	echo "load_bpf_programs: $iface"
-
-	# Check if interface exists
-	[ -z "$iface" ] && return 1
-	[ ! -e "/sys/class/net/$iface" ] && return 1
-
-	# Add clsact qdisc
-	tc qdisc add dev "$iface" clsact 2>/dev/null || true
-
-	# Load main aw-bpf.o program via TC if available (per interface)
-	if [ -f "$aw_bpf_file" ]; then
-		tc filter add dev "$iface" ingress prio 1 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/dev/null
-		tc filter add dev "$iface" egress prio 1 bpf da obj "$aw_bpf_file" sec tc/egress 2>/dev/null
-		if [ $? -eq 0 ]; then
-			echo "aw-bpf loaded successfully on $iface"
-		else
-			echo "Failed to load aw-bpf on $iface" >&2
-			return 1
-		fi
-	else
-		echo "aw-bpf.o not found, skipping" >&2
-		return 1
-	fi
-
-	return 0
-}
-
 handle_gateway() {
 	local section="$1"
 	local gateway_name gateway_channel gateway_id
@@ -323,8 +264,6 @@ prepare_wifidog_conf() {
 	prepare_auth_server_settings
 	prepare_longconn_settings
 	prepare_device_info
-	config_foreach unload_bpf_programs gateway
-	config_foreach load_bpf_programs gateway
 	config_foreach handle_gateway gateway
 	prepare_common_settings
 }
