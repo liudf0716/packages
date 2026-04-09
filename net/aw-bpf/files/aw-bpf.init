@@ -1,0 +1,299 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2025 Dengfeng Liu
+# aw-bpf service - manages aw-bpf lifecycle: event_daemon, xdpi module, BPF maps
+
+START=98
+USE_PROCD=1
+NAME=aw-bpf
+PROG="/usr/bin/event_daemon"
+BPF_FS_ROOT="/sys/fs/bpf"
+AW_BPF_PIN_DIR="$BPF_FS_ROOT/tc/globals"
+AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
+AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_stats_map"
+AW_BPF_PROGS="tc_ingress tc_egress"
+AW_BPF_LAN_IFACES=""
+
+resolve_lan_ifaces() {
+	local lan_device lan_ifname
+
+	AW_BPF_LAN_IFACES=""
+
+	config_load network
+	config_get lan_device lan device
+	config_get lan_ifname lan ifname
+
+	if [ -n "$lan_device" ] && [ -e "/sys/class/net/$lan_device" ]; then
+		AW_BPF_LAN_IFACES="$lan_device"
+		return 0
+	fi
+
+	for iface in $lan_ifname; do
+		if [ -n "$iface" ] && [ -e "/sys/class/net/$iface" ]; then
+			AW_BPF_LAN_IFACES="$iface"
+			return 0
+		fi
+	done
+}
+
+detach_tc_programs() {
+	local iface="$1"
+
+	[ -z "$iface" ] && return 0
+	[ ! -e "/sys/class/net/$iface" ] && return 0
+
+	tc filter del dev "$iface" ingress 2>/dev/null || true
+	tc filter del dev "$iface" egress 2>/dev/null || true
+	tc qdisc del dev "$iface" clsact 2>/dev/null || true
+}
+
+attach_tc_programs() {
+	local iface="$1"
+	local aw_bpf_file="/lib/bpf/aw-bpf.o"
+
+	[ -z "$iface" ] && return 0
+	[ ! -e "/sys/class/net/$iface" ] && return 0
+	[ ! -f "$aw_bpf_file" ] && {
+		echo "aw-bpf.o not found at $aw_bpf_file" >&2
+		return 1
+	}
+
+	# Recreate clsact on every attach so old filters do not accumulate.
+	tc qdisc del dev "$iface" clsact 2>/dev/null || true
+	tc qdisc add dev "$iface" clsact 2>/dev/null || true
+
+	if ! tc filter add dev "$iface" ingress prio 1 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/tmp/aw-bpf.ingress.err; then
+		echo "Failed to attach aw-bpf ingress to $iface: $(cat /tmp/aw-bpf.ingress.err 2>/dev/null)" >&2
+		rm -f /tmp/aw-bpf.ingress.err
+		return 1
+	fi
+	rm -f /tmp/aw-bpf.ingress.err
+
+	if ! tc filter add dev "$iface" egress prio 1 bpf da obj "$aw_bpf_file" sec tc/egress 2>/tmp/aw-bpf.egress.err; then
+		echo "Failed to attach aw-bpf egress to $iface: $(cat /tmp/aw-bpf.egress.err 2>/dev/null)" >&2
+		rm -f /tmp/aw-bpf.egress.err
+		tc filter del dev "$iface" ingress 2>/dev/null || true
+		tc qdisc del dev "$iface" clsact 2>/dev/null || true
+		return 1
+	fi
+	rm -f /tmp/aw-bpf.egress.err
+
+	echo "aw-bpf attached on $iface" >&2
+	return 0
+}
+
+cleanup_aw_bpf_pins() {
+	local entry
+
+	for entry in $AW_BPF_PROGS $AW_BPF_MAPS; do
+		[ -e "$BPF_FS_ROOT/$entry" ] && rm -f "$BPF_FS_ROOT/$entry"
+		[ -e "$AW_BPF_PIN_DIR/$entry" ] && rm -f "$AW_BPF_PIN_DIR/$entry"
+		[ -e "$AW_BPF_LEGACY_PIN_DIR/$entry" ] && rm -f "$AW_BPF_LEGACY_PIN_DIR/$entry"
+	done
+}
+
+load_bpf_resources() {
+	echo "Loading BPF resources..." >&2
+	mkdir -p "$AW_BPF_PIN_DIR" 2>/dev/null || true
+
+	cleanup_aw_bpf_pins
+	resolve_lan_ifaces
+
+	if [ -z "$AW_BPF_LAN_IFACES" ]; then
+		echo "No valid interfaces found from network.lan" >&2
+		return 1
+	fi
+
+	for iface in $AW_BPF_LAN_IFACES; do
+		attach_tc_programs "$iface" || return 1
+	done
+
+	return 0
+}
+
+load_xdpi() {
+	# Load xdpi kernel module (preferred) or fallback to insmod if module file present
+	if lsmod | grep -q xdpi; then
+		echo "xdpi module already loaded" >&2
+		return 0
+	fi
+
+	# Try modprobe first
+	if command -v modprobe >/dev/null 2>&1; then
+		if modprobe xdpi-bpf 2>/dev/null; then
+			echo "xdpi-bpf module loaded via modprobe" >&2
+			return 0
+		fi
+	fi
+
+	# Try insmod from common locations
+	for modfile in /lib/modules/$(uname -r)/xdpi-bpf.ko /lib/modules/$(uname -r)/extra/xdpi-bpf.ko /lib/xdpi-bpf.ko; do
+		if [ -f "$modfile" ]; then
+			insmod "$modfile" 2>/dev/null && echo "xdpi-bpf module loaded via insmod $modfile" >&2 && return 0 || true
+		fi
+	done
+
+	echo "Warning: xdpi-bpf module not found or failed to load" >&2
+	return 1
+}
+
+load_dns_bpf_program() {
+	local dns_bpf_file="/lib/bpf/dns-bpf.o"
+
+	if [ -f "$dns_bpf_file" ] && [ ! -e /sys/fs/bpf/tc/globals/dns_egress ]; then
+		mkdir -p /sys/fs/bpf/tc/globals 2>/dev/null || true
+		echo "Loading DNS BPF program from: $dns_bpf_file (global load)" >&2
+
+		sleep 1
+		local load_output
+		load_output=$(bpftool prog load "$dns_bpf_file" /sys/fs/bpf/tc/globals/dns_egress type classifier 2>&1)
+		local load_status=$?
+
+		if [ $load_status -ne 0 ]; then
+			echo "Failed to load DNS BPF program. Error: $load_output" >&2
+			return 1
+		fi
+
+		# Give kernel a moment to create maps
+		sleep 1
+
+		# Pin known dns maps if they exist
+		if [ -e /sys/fs/bpf/dns_ringbuf ] && [ ! -e /sys/fs/bpf/tc/globals/dns_ringbuf ]; then
+			bpftool map pin name dns_ringbuf /sys/fs/bpf/tc/globals/dns_ringbuf 2>/dev/null && rm -f /sys/fs/bpf/dns_ringbuf || true
+			echo "dns_ringbuf pinned to /sys/fs/bpf/tc/globals/"
+		fi
+		if [ -e /sys/fs/bpf/dns_stats_map ] && [ ! -e /sys/fs/bpf/tc/globals/dns_stats_map ]; then
+			bpftool map pin name dns_stats_map /sys/fs/bpf/tc/globals/dns_stats_map 2>/dev/null && rm -f /sys/fs/bpf/dns_stats_map || true
+			echo "dns_stats_map pinned to /sys/fs/bpf/tc/globals/"
+		fi
+
+		# Try to get program id
+		local dns_prog_id
+		dns_prog_id=$(bpftool prog show name dns_handler_egress 2>/dev/null | head -1 | cut -d: -f1)
+		if [ -z "$dns_prog_id" ]; then
+			dns_prog_id=$(bpftool prog show pinned /sys/fs/bpf/tc/globals/dns_egress 2>/dev/null | head -1 | cut -d: -f1)
+		fi
+		if [ -z "$dns_prog_id" ]; then
+			dns_prog_id=$(echo "$load_output" | grep -o 'id [0-9]*' | cut -d' ' -f2)
+		fi
+
+		if [ -n "$dns_prog_id" ] && [ "$dns_prog_id" -gt 0 ] 2>/dev/null; then
+			echo "dns-bpf egress program loaded with ID: $dns_prog_id" >&2
+			# Try to insert into prog_array_map index 0
+			if bpftool map show name prog_array_map >/dev/null 2>&1 || bpftool map show pinned /sys/fs/bpf/tc/globals/prog_array_map >/dev/null 2>&1; then
+				if bpftool map update name prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null || \
+				   bpftool map update pinned /sys/fs/bpf/tc/globals/prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null; then
+					echo "DNS egress program (ID: $dns_prog_id) added to prog_array_map at index 0" >&2
+				else
+					echo "Failed to add DNS program to prog_array_map" >&2
+				fi
+			else
+				echo "prog_array_map not found; DNS program loaded but tail call not configured" >&2
+			fi
+		else
+			echo "Failed to obtain dns program id after load" >&2
+			return 1
+		fi
+	elif [ -f "$dns_bpf_file" ] && [ -e /sys/fs/bpf/tc/globals/dns_egress ]; then
+		echo "DNS BPF program already loaded (pinned at /sys/fs/bpf/tc/globals/dns_egress)" >&2
+	else
+		echo "dns-bpf.o not found at $dns_bpf_file, skipping DNS program loading" >&2
+	fi
+
+	return 0
+}
+
+# Global cleanup function for all BPF programs and maps
+cleanup_bpf_resources() {
+	echo "Cleaning up global BPF resources..." >&2
+
+	resolve_lan_ifaces
+	for iface in $AW_BPF_LAN_IFACES; do
+		detach_tc_programs "$iface"
+	done
+	
+	# Clean up DNS BPF programs loaded via bpftool
+	[ -e /sys/fs/bpf/tc/globals/dns_egress ] && rm -f /sys/fs/bpf/tc/globals/dns_egress
+
+	# Clean up aw-bpf program and map pins, including the legacy xdp/globals location.
+	cleanup_aw_bpf_pins
+
+	# Clean up dns-bpf maps
+	[ -e /sys/fs/bpf/tc/globals/dns_ringbuf ] && rm -f /sys/fs/bpf/tc/globals/dns_ringbuf
+	[ -e /sys/fs/bpf/tc/globals/dns_stats_map ] && rm -f /sys/fs/bpf/tc/globals/dns_stats_map
+
+	return 0
+}
+
+unload_xdpi() {
+	# check if xdpi-bpf module is loaded
+	if ! lsmod | grep -q xdpi; then
+		echo "xdpi module not loaded" >&2
+		return 0
+	fi
+
+	# Try to unload the module and capture any error messages
+	local rmmod_output
+	rmmod_output=$(rmmod xdpi-bpf 2>&1)
+	local rmmod_status=$?
+
+	if [ $rmmod_status -ne 0 ]; then
+		echo "Note: Failed to unload xdpi module (may still be in use). Error: $rmmod_output" >&2
+		return 0
+	fi
+
+	# Verify module was actually unloaded
+	if lsmod | grep -q xdpi; then
+		echo "Note: Module still loaded after rmmod attempt" >&2
+		return 0
+	fi
+
+	echo "xdpi module unloaded successfully" >&2
+	return 0
+}
+
+start_service() {
+	local enable_event_log
+	
+	load_xdpi
+	load_bpf_resources
+
+	# Check if event_daemon binary exists first
+	if ! command -v "$PROG" >/dev/null 2>&1; then
+		echo "event_daemon binary not found" >&2
+		return 1
+	fi
+	
+	# Load aw-bpf config (independent from wifidogx)
+	config_load aw-bpf
+	config_get enable_event_log common enable_event_log 0
+	
+	if [ "$enable_event_log" -eq 0 ]; then
+		echo "Event logging is disabled in aw-bpf config" >&2
+		return
+	fi
+
+	echo "Starting aw-bpf service (event_daemon)" >&2
+	procd_open_instance
+	procd_set_param command "$PROG"
+	procd_set_param respawn
+	procd_set_param respawn_threshold 10
+	procd_set_param respawn_timeout 5
+	procd_set_param respawn_retry 5
+	procd_close_instance
+}
+
+stop_service() {
+	echo "Stopping aw-bpf service..." >&2
+	
+	# First detach tc programs and clean pinned BPF resources.
+	cleanup_bpf_resources
+
+	# Then unload xdpi once no tc program is holding references.
+	unload_xdpi
+	
+	echo "aw-bpf cleanup completed" >&2
+}
+
+service_triggers() {
+	procd_add_reload_trigger "aw-bpf"
+}

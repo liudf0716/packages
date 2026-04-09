@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Enable the init script on first boot so procd can call start_service().
+# Whether the daemon actually runs is still controlled by /etc/config/clawwrt.
+/etc/init.d/clawwrt enable >/dev/null 2>&1
+
+exit 0

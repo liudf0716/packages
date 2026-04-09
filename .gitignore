@@ -7,3 +7,4 @@
 /.env
 /.env.*
 /*.patch
+.github/copilot-instructions.md
