@@ -27,13 +27,9 @@ define Package/apfree-wifidog
   SUBMENU:=Captive Portals
   SECTION:=net
   CATEGORY:=Network
-<<<<<<< HEAD
-  DEPENDS:=+zlib +libjson-c +libevent2 +libevent2-openssl +libuci +openssl-util +libnetfilter-queue +conntrack +libmosquitto
-=======
 	DEPENDS:=+zlib +libjson-c +libevent2 +libevent2-openssl +libuci \
 						+openssl-util +libnetfilter-queue +conntrack +libmosquitto \
 						+libnftnl +libmnl +libbpf
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
   TITLE:=Apfree's wireless captive portal solution
   URL:=https://github.com/liudf0716/apfree_wifidog
 endef
@@ -54,10 +50,6 @@ define Package/apfree-wifidog/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wifidogx $(1)/usr/bin/wifidogx
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wdctlx $(1)/usr/bin/wdctlx
 	$(INSTALL_DIR) $(1)/usr/sbin
-<<<<<<< HEAD
-	$(INSTALL_BIN) ./files/wdping $(1)/usr/sbin/
-=======
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 	$(INSTALL_DIR) $(1)/etc
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wifidog-msg.html $(1)/etc/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wifidog-redir.html $(1)/etc/
