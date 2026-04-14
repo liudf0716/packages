@@ -10,26 +10,17 @@ CONFIGFILE="/tmp/wifidogx.conf"
 handle_gateway() {
 	local section="$1"
 	local gateway_name gateway_channel gateway_id
-<<<<<<< HEAD
-=======
 	local gateway_subnetv4
 	local gateway_auth_enabled
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 
 	config_get gateway_name "$section" gateway_name
 	config_get gateway_channel "$section" gateway_channel
 	config_get gateway_id "$section" gateway_id
-<<<<<<< HEAD
-
-	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ]; then
-		echo "gateway_name and gateway_channel are required for $section" >&2
-=======
 	config_get gateway_auth_enabled "$section" gateway_auth_enabled 1
 
 
 	if [ -z "$gateway_name" ] || [ -z "$gateway_channel" ] ; then
 		echo "gateway_name and gateway_channel  are required for $section" >&2
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 		return
 	fi
 
@@ -43,14 +34,6 @@ handle_gateway() {
 		uci set wifidogx."$section".gateway_id="$gateway_id"
 		uci commit wifidogx
 	fi
-<<<<<<< HEAD
-
-	printf "GatewaySetting { 
-		GatewayInterface %s
-		GatewayChannel %s
-		GatewayID %s
-	}\n" "$gateway_name" "$gateway_channel" "$gateway_id" >> "$CONFIGFILE"
-=======
 	# according to the gateway_name to get the subnetv4
 	local gateway_ipv4=$(ifconfig "$gateway_name" | awk '/inet addr:/ {print $2}' | cut -d: -f2)
 	local gateway_maskv4=$(ifconfig "$gateway_name" | awk '/Mask:/ {print $4}' | cut -d: -f2)
@@ -71,7 +54,6 @@ handle_gateway() {
 
 	printf "GatewaySetting {\n\tGatewayAuthEnabled %s\n\tGatewayInterface %s\n\tGatewayChannel %s\n\tGatewayID %s\n\tGatewaySubnetV4 %s\n}\n" \
 		 "${gateway_auth_enabled}" "${gateway_name}" "${gateway_channel}" "${gateway_id}" "${gateway_subnetv4}" >> "$CONFIGFILE"
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 }
 
 add_white_list_entries() {
@@ -89,39 +71,6 @@ add_white_list_entries() {
 }
 
 prepare_common_settings() {
-<<<<<<< HEAD
-	printf "CheckInterval %s\nClientTimeout %s\nJsFilter %s\nWiredPassed %s\nBypassAppleCNA %s\nEnableDNSForward %s\n" \
-		"$check_interval" "$client_timeout" "$js_filter" "$wired_passed" "$apple_cna" "$enable_dns_forward" >> "$CONFIGFILE"
-
-	[ -n "$trusted_domains" ] && printf "TrustedDomains %s\n" "$(echo "$trusted_domains" | tr ' ' ',')" >> "$CONFIGFILE"
-	[ -n "$trusted_macs" ] && printf "TrustedMACList %s\n" "$(echo "$trusted_macs" | tr ' ' ',')" >> "$CONFIGFILE"
-	[ -n "$trusted_wildcard_domains" ] && printf "TrustedPanDomains %s\n" "$(echo "$trusted_wildcard_domains" | tr ' ' ',')" >> "$CONFIGFILE"
-}
-
-prepare_auth_server_settings() {
-	case "$auth_server_mode" in
-	cloud)
-		printf "DeviceID %s\nAuthServer {\n\tHostname %s\n\tHTTPPort %s\n\tPath %s\n}\n" \
-			"$device_id" "$auth_server_hostname" "$auth_server_port" "$auth_server_path" >> "$CONFIGFILE"
-        
-		case "$long_conn_mode" in
-		ws|wss)
-			ws_hostname="${ws_server_hostname:-$auth_server_hostname}"
-			ws_port="${ws_server_port:-$auth_server_port}"
-			ws_ssl=$([ "$long_conn_mode" = "wss" ] && echo 1 || echo 0)
-			printf "WebSocket {\n\tWSServer %s\n\tWSServerPort %s\n\tWSServerPath %s\n\tWSServerSSL %s\n}\n" \
-				"$ws_hostname" "$ws_port" "$ws_server_path" "$ws_ssl" >> "$CONFIGFILE"
-			;;
-		mqtt)
-			mqtt_hostname="${mqtt_server_hostname:-$auth_server_hostname}"
-			mqtt_port="${mqtt_server_port:-1883}"
-			printf "MQTT {\n\tMQTTHost %s\n\tMQTTPort %s\n\tMQTTUsername %s\n\tMQTTPassword %s\n}\n" \
-				"$mqtt_hostname" "$mqtt_port" "${mqtt_username:-}" "${mqtt_password:-}" >> "$CONFIGFILE"
-			;;
-		esac
-			;;
-	local)
-=======
 	printf "CheckInterval %s\nClientTimeout %s\nJsFilter %s\nWiredPassed %s\nBypassAppleCNA %s\n" \
 		"$check_interval" "$client_timeout" "$js_filter" "$wired_passed" "$apple_cna" >> "$CONFIGFILE"
 	
@@ -196,13 +145,10 @@ prepare_auth_server_settings() {
 	local)
 		printf "AuthServerMode 2\n" >> "$CONFIGFILE"
 		[ -n "$device_id" ] && printf "DeviceID %s\n" "$device_id" >> "$CONFIGFILE"
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 		[ -n "$auth_server_offline_file" ] && printf "AuthServerOfflineFile %s\n" "$auth_server_offline_file" >> "$CONFIGFILE"
 		[ -n "$local_portal" ] && printf "LocalPortal %s\n" "$local_portal" >> "$CONFIGFILE"
 		;;
 	esac
-<<<<<<< HEAD
-=======
 
 	[ -n "$internet_offline_file" ] && printf "InternetOfflineFile %s\n" "$internet_offline_file" >> "$CONFIGFILE"
 }
@@ -252,15 +198,11 @@ prepare_longconn_settings() {
 			"$mqtt_server_hostname" "$mqtt_server_port" "$mqtt_ssl" "${mqtt_username:-}" "${mqtt_password:-}" >> "$CONFIGFILE"
 		;;
 	esac
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 }
 
 prepare_external_interface() {
 	[ -z "$external_interface" ] && echo "No ExternalInterface " >&2 && return
 	local external_interface_name
-<<<<<<< HEAD
-	external_interface_name=$(uci get network."$external_interface".device)
-=======
 
 	if [ "$external_interface" = "wwan" ]; then
 		external_interface_name=$(ubus call network.interface."$external_interface" status | jsonfilter -e '@.device')
@@ -268,7 +210,6 @@ prepare_external_interface() {
 		external_interface_name=$(uci get network."$external_interface".device)
 	fi
 
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 	[ -z "$external_interface_name" ] && echo "Failed to get device name for $external_interface" >&2 && return
   
 	printf "ExternalInterface %s\n" "$external_interface_name" >> "$CONFIGFILE"
@@ -276,33 +217,20 @@ prepare_external_interface() {
 
 prepare_wifidog_conf() {
 	[ -f "$CONFIGFILE" ] && rm -f "$CONFIGFILE"
-<<<<<<< HEAD
-	local long_conn_mode_value='"ws", "wss", "mqtt", "none"'
-	local auth_server_mode_value='"cloud", "local"'
-=======
 	local auth_server_mode_value='"cloud", "bypass", "local"'
 	
 	# 获取选中的认证服务器
 	local selected_auth_server
 	selected_auth_server=$(uci get wifidogx.common.selected_auth_server 2>/dev/null)
 	
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
     
 	uci_validate_section "$NAME" "$NAME" common \
 		'enabled:bool:0' \
 		"auth_server_mode:or($auth_server_mode_value)" \
-<<<<<<< HEAD
-		'log_level:integer:7' \
-		'device_id:string' \
-		'auth_server_hostname:string' \
-		'auth_server_port:port:443' \
-		'auth_server_path:string:/wifidog/' \
-=======
 		'selected_auth_server:string' \
 		'selected_long_conn:string' \
 		'log_level:integer:7' \
 		'device_id:string' \
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 		'check_interval:integer:60' \
 		'client_timeout:integer:5' \
 		'wired_passed:bool:1' \
@@ -313,21 +241,6 @@ prepare_wifidog_conf() {
 		'app_white_list:list(string)' \
 		'mac_white_list:list(string)' \
 		'wildcard_white_list:list(string)' \
-<<<<<<< HEAD
-		'enable_dns_forward:bool:1' \
-		"long_conn_mode:or($long_conn_mode_value)" \
-		'ws_server_hostname:string' \
-		'ws_server_port:port:80' \
-		'ws_server_path:string:/ws/wifidogx' \
-		'mqtt_server_hostname:string' \
-		'mqtt_server_port:port:1883' \
-		'mqtt_username:string' \
-		'mqtt_password:string' \
-		'js_filter:bool:1' \
-		'auth_server_offline_file:string' \
-		'local_portal:string' \
-		'external_interface:string'
-=======
 		'js_filter:bool:1' \
 		'auth_server_offline_file:string' \
 		'internet_offline_file:string' \
@@ -342,7 +255,6 @@ prepare_wifidog_conf() {
 		'ap_longitude:string' \
 		'ap_latitude:string' \
 		'location_id:string'
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 
 	[ -n "$app_white_list" ] && add_white_list_entries "app_white_list" "domain_name" "trusted_domains"
 	[ -n "$mac_white_list" ] && add_white_list_entries "mac_white_list" "mac_address" "trusted_macs"
@@ -350,22 +262,16 @@ prepare_wifidog_conf() {
 
 	prepare_external_interface
 	prepare_auth_server_settings
-<<<<<<< HEAD
-=======
 	prepare_longconn_settings
 	prepare_device_info
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 	config_foreach handle_gateway gateway
 	prepare_common_settings
 }
 
-<<<<<<< HEAD
-=======
 service_triggers() {
 	procd_add_reload_trigger "wifidogx"
 }
 
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
 start_service() {
 	config_load "$NAME"
 
@@ -391,12 +297,3 @@ reload_service() {
 	stop
 	start
 }
-<<<<<<< HEAD
-
-service_triggers() {
-	procd_add_reload_trigger "wifidogx" "firewall"
-	procd_add_interface_trigger "interface.*.up" "wan" /etc/init.d/wifidogx reload
-	procd_add_interface_trigger "interface.*.up" "wan6" /etc/init.d/wifidogx reload
-}
-=======
->>>>>>> e6fefbec0 (misc: Convert multimedia/whispercpp to normal directory; cleanup .gitmodules)
