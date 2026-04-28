@@ -12,6 +12,7 @@ AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
 AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_stats_map"
 AW_BPF_PROGS="tc_ingress tc_egress"
 AW_BPF_LAN_IFACES=""
+AW_BPF_WAN_IFACES=""
 
 resolve_lan_ifaces() {
 	local lan_device lan_ifname
@@ -30,6 +31,28 @@ resolve_lan_ifaces() {
 	for iface in $lan_ifname; do
 		if [ -n "$iface" ] && [ -e "/sys/class/net/$iface" ]; then
 			AW_BPF_LAN_IFACES="$iface"
+			return 0
+		fi
+	done
+}
+
+resolve_wan_ifaces() {
+	local wan_device wan_ifname
+
+	AW_BPF_WAN_IFACES=""
+
+	config_load network
+	config_get wan_device wan device
+	config_get wan_ifname wan ifname
+
+	if [ -n "$wan_device" ] && [ -e "/sys/class/net/$wan_device" ]; then
+		AW_BPF_WAN_IFACES="$wan_device"
+		return 0
+	fi
+
+	for iface in $wan_ifname; do
+		if [ -n "$iface" ] && [ -e "/sys/class/net/$iface" ]; then
+			AW_BPF_WAN_IFACES="$iface"
 			return 0
 		fi
 	done
@@ -107,6 +130,8 @@ load_bpf_resources() {
 		attach_tc_programs "$iface" || return 1
 	done
 
+	load_dns_bpf_program
+
 	return 0
 }
 
@@ -138,65 +163,37 @@ load_xdpi() {
 
 load_dns_bpf_program() {
 	local dns_bpf_file="/lib/bpf/dns-bpf.o"
+	local xdp_pin_base="/sys/fs/bpf/aw"
 
-	if [ -f "$dns_bpf_file" ] && [ ! -e /sys/fs/bpf/tc/globals/dns_egress ]; then
-		mkdir -p /sys/fs/bpf/tc/globals 2>/dev/null || true
-		echo "Loading DNS BPF program from: $dns_bpf_file (global load)" >&2
+	if [ ! -f "$dns_bpf_file" ]; then
+		echo "dns-bpf.o not found at $dns_bpf_file" >&2
+		return 0
+	fi
 
-		sleep 1
-		local load_output
-		load_output=$(bpftool prog load "$dns_bpf_file" /sys/fs/bpf/tc/globals/dns_egress type classifier 2>&1)
-		local load_status=$?
+	mkdir -p "$xdp_pin_base" 2>/dev/null || true
 
-		if [ $load_status -ne 0 ]; then
-			echo "Failed to load DNS BPF program. Error: $load_output" >&2
+	resolve_wan_ifaces
+	if [ -z "$AW_BPF_WAN_IFACES" ]; then
+		echo "No valid WAN interfaces found. Skip loading DNS XDP." >&2
+		return 1
+	fi
+
+	for iface in $AW_BPF_WAN_IFACES; do
+		echo "Attaching DNS XDP program to $iface..." >&2
+		if ! ip link set dev "$iface" xdp obj "$dns_bpf_file" sec xdp 2>/tmp/aw-bpf.xdp.err; then
+			echo "Failed to attach dns xdp to $iface: $(cat /tmp/aw-bpf.xdp.err 2>/dev/null)" >&2
+			rm -f /tmp/aw-bpf.xdp.err
 			return 1
 		fi
+		rm -f /tmp/aw-bpf.xdp.err
+	done
 
-		# Give kernel a moment to create maps
-		sleep 1
+	sleep 1
 
-		# Pin known dns maps if they exist
-		if [ -e /sys/fs/bpf/dns_ringbuf ] && [ ! -e /sys/fs/bpf/tc/globals/dns_ringbuf ]; then
-			bpftool map pin name dns_ringbuf /sys/fs/bpf/tc/globals/dns_ringbuf 2>/dev/null && rm -f /sys/fs/bpf/dns_ringbuf || true
-			echo "dns_ringbuf pinned to /sys/fs/bpf/tc/globals/"
-		fi
-		if [ -e /sys/fs/bpf/dns_stats_map ] && [ ! -e /sys/fs/bpf/tc/globals/dns_stats_map ]; then
-			bpftool map pin name dns_stats_map /sys/fs/bpf/tc/globals/dns_stats_map 2>/dev/null && rm -f /sys/fs/bpf/dns_stats_map || true
-			echo "dns_stats_map pinned to /sys/fs/bpf/tc/globals/"
-		fi
-
-		# Try to get program id
-		local dns_prog_id
-		dns_prog_id=$(bpftool prog show name dns_handler_egress 2>/dev/null | head -1 | cut -d: -f1)
-		if [ -z "$dns_prog_id" ]; then
-			dns_prog_id=$(bpftool prog show pinned /sys/fs/bpf/tc/globals/dns_egress 2>/dev/null | head -1 | cut -d: -f1)
-		fi
-		if [ -z "$dns_prog_id" ]; then
-			dns_prog_id=$(echo "$load_output" | grep -o 'id [0-9]*' | cut -d' ' -f2)
-		fi
-
-		if [ -n "$dns_prog_id" ] && [ "$dns_prog_id" -gt 0 ] 2>/dev/null; then
-			echo "dns-bpf egress program loaded with ID: $dns_prog_id" >&2
-			# Try to insert into prog_array_map index 0
-			if bpftool map show name prog_array_map >/dev/null 2>&1 || bpftool map show pinned /sys/fs/bpf/tc/globals/prog_array_map >/dev/null 2>&1; then
-				if bpftool map update name prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null || \
-				   bpftool map update pinned /sys/fs/bpf/tc/globals/prog_array_map key 00 00 00 00 value id $dns_prog_id 2>/dev/null; then
-					echo "DNS egress program (ID: $dns_prog_id) added to prog_array_map at index 0" >&2
-				else
-					echo "Failed to add DNS program to prog_array_map" >&2
-				fi
-			else
-				echo "prog_array_map not found; DNS program loaded but tail call not configured" >&2
-			fi
-		else
-			echo "Failed to obtain dns program id after load" >&2
-			return 1
-		fi
-	elif [ -f "$dns_bpf_file" ] && [ -e /sys/fs/bpf/tc/globals/dns_egress ]; then
-		echo "DNS BPF program already loaded (pinned at /sys/fs/bpf/tc/globals/dns_egress)" >&2
-	else
-		echo "dns-bpf.o not found at $dns_bpf_file, skipping DNS program loading" >&2
+	local xdp_prog_id=$(bpftool prog show name xdp_dns_monitor 2>/dev/null | head -n1 | cut -d':' -f1)
+	if [ -n "$xdp_prog_id" ]; then
+		[ ! -e "$xdp_pin_base/dns_ringbuf" ] && bpftool map pin name dns_ringbuf "$xdp_pin_base/dns_ringbuf" 2>/dev/null
+		[ ! -e "$xdp_pin_base/dns_stats_map" ] && bpftool map pin name dns_stats_map "$xdp_pin_base/dns_stats_map" 2>/dev/null
 	fi
 
 	return 0
@@ -211,15 +208,15 @@ cleanup_bpf_resources() {
 		detach_tc_programs "$iface"
 	done
 	
-	# Clean up DNS BPF programs loaded via bpftool
-	[ -e /sys/fs/bpf/tc/globals/dns_egress ] && rm -f /sys/fs/bpf/tc/globals/dns_egress
+	resolve_wan_ifaces
+	for iface in $AW_BPF_WAN_IFACES; do
+		ip link set dev "$iface" xdp off 2>/dev/null || true
+	done
+
+	rm -rf /sys/fs/bpf/aw/dns_* 2>/dev/null
 
 	# Clean up aw-bpf program and map pins, including the legacy xdp/globals location.
 	cleanup_aw_bpf_pins
-
-	# Clean up dns-bpf maps
-	[ -e /sys/fs/bpf/tc/globals/dns_ringbuf ] && rm -f /sys/fs/bpf/tc/globals/dns_ringbuf
-	[ -e /sys/fs/bpf/tc/globals/dns_stats_map ] && rm -f /sys/fs/bpf/tc/globals/dns_stats_map
 
 	return 0
 }
