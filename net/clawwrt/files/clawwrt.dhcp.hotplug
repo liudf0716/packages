@@ -1,0 +1,23 @@
+#!/bin/sh
+
+[ "$ACTION" = "add" ] || exit 0
+[ -x /usr/bin/clawwrt-cli ] || exit 0
+[ -n "$MACADDR" ] || exit 0
+[ -n "$IPADDR" ] || exit 0
+[ -r /usr/share/libubox/jshn.sh ] || exit 0
+
+. /usr/share/libubox/jshn.sh
+
+json_init
+json_add_string mac "$MACADDR"
+json_add_string ip "$IPADDR"
+[ -n "$HOSTNAME" ] && json_add_string name "$HOSTNAME"
+[ -n "$HOSTNAME" ] && json_add_string hostname "$HOSTNAME"
+[ -n "$INTERFACE" ] && json_add_string interface "$INTERFACE"
+[ -n "$DEVICE" ] && json_add_string device "$DEVICE"
+
+payload="$(json_dump)"
+
+/usr/bin/clawwrt-cli report client_connected "$payload" >/dev/null 2>&1 &
+
+exit 0

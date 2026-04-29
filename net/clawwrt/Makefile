@@ -17,7 +17,9 @@ PKG_BUILD_PARALLEL:=1
 PKG_BUILD_FLAGS:=no-mips16
 
 GO_PKG:=github.com/liudf0716/clawwrt
-GO_PKG_BUILD_PKG:=github.com/liudf0716/clawwrt/cmd/clawwrt
+GO_PKG_BUILD_PKG:= \
+  github.com/liudf0716/clawwrt/cmd/clawwrt \
+  github.com/liudf0716/clawwrt/cmd/clawwrt-cli
 GO_PKG_LDFLAGS_X:=github.com/liudf0716/clawwrt/internal/version.Version=$(PKG_VERSION)
 GO_PKG_LDFLAGS:=-s -w
 
@@ -50,6 +52,12 @@ define Package/clawwrt/install
 	$(INSTALL_BIN) ./files/clawwrt.init $(1)/etc/init.d/clawwrt
 	$(INSTALL_DIR) $(1)/etc/config
 	$(CP) ./files/clawwrt.conf $(1)/etc/config/clawwrt
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/dhcp
+	$(INSTALL_BIN) ./files/clawwrt.dhcp.hotplug $(1)/etc/hotplug.d/dhcp/99-clawwrt
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/net
+	$(INSTALL_BIN) ./files/clawwrt.net.hotplug $(1)/etc/hotplug.d/net/99-clawwrt
+	$(INSTALL_DIR) $(1)/etc/hotplug.d/usb
+	$(INSTALL_BIN) ./files/clawwrt.usb.hotplug $(1)/etc/hotplug.d/usb/99-clawwrt
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/clawwrt.defaults $(1)/etc/uci-defaults/99_clawwrt
 endef

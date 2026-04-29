@@ -1,0 +1,47 @@
+#!/bin/sh
+
+[ -x /usr/bin/clawwrt-cli ] || exit 0
+[ -r /usr/share/libubox/jshn.sh ] || exit 0
+
+op=""
+case "$ACTION" in
+  add)
+    op="usb_storage_attached"
+    ;;
+  remove)
+    op="usb_storage_detached"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+# Filter to mass-storage class events to approximate USB disk plug/unplug.
+# Typical INTERFACE values for storage start with "8/".
+if [ -n "$INTERFACE" ]; then
+  case "$INTERFACE" in
+    8/*)
+      ;;
+    *)
+      exit 0
+      ;;
+  esac
+fi
+
+. /usr/share/libubox/jshn.sh
+
+json_init
+json_add_string action "$ACTION"
+[ -n "$PRODUCT" ] && json_add_string product "$PRODUCT"
+[ -n "$TYPE" ] && json_add_string type "$TYPE"
+[ -n "$INTERFACE" ] && json_add_string interface "$INTERFACE"
+[ -n "$DEVICE" ] && json_add_string device "$DEVICE"
+[ -n "$DEVICENAME" ] && json_add_string devname "$DEVICENAME"
+[ -n "$BUSNUM" ] && json_add_string busnum "$BUSNUM"
+[ -n "$DEVNUM" ] && json_add_string devnum "$DEVNUM"
+
+payload="$(json_dump)"
+
+/usr/bin/clawwrt-cli report "$op" "$payload" >/dev/null 2>&1 &
+
+exit 0

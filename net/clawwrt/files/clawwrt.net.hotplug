@@ -1,0 +1,32 @@
+#!/bin/sh
+
+[ -x /usr/bin/clawwrt-cli ] || exit 0
+[ -r /usr/share/libubox/jshn.sh ] || exit 0
+
+op=""
+case "$ACTION" in
+  add|ifup|register)
+    op="net_link_up"
+    ;;
+  remove|ifdown|unregister)
+    op="net_link_down"
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+
+. /usr/share/libubox/jshn.sh
+
+json_init
+json_add_string action "$ACTION"
+[ -n "$INTERFACE" ] && json_add_string interface "$INTERFACE"
+[ -n "$DEVICE" ] && json_add_string device "$DEVICE"
+[ -n "$IFACE" ] && json_add_string iface "$IFACE"
+[ -n "$DEVICENAME" ] && json_add_string devname "$DEVICENAME"
+
+payload="$(json_dump)"
+
+/usr/bin/clawwrt-cli report "$op" "$payload" >/dev/null 2>&1 &
+
+exit 0
