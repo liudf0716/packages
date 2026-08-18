@@ -25,7 +25,6 @@ define Package/libngtcp2/config
 
     config NGTCP2_CRYPTO_WOLFSSL
       bool "wolfSSL (recommended for OpenWrt)"
-      depends on PACKAGE_libwolfssl
 
     config NGTCP2_CRYPTO_OPENSSL
       bool "OpenSSL"
