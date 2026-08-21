@@ -9,11 +9,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
 PKG_VERSION:=1.08.21
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=3aa26d513585aff655719d772a2186c968ec4aa7315641fe3d21aee69f20ea5b
+PKG_HASH:=9494be5768e897c6501ce7308e27f347a9a597086b3490f4413503c319ebbb74
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -31,7 +31,7 @@ define Package/aw-bpf
   SECTION:=net
   CATEGORY:=Network
   TITLE:=ApFree eBPF programs and tools
-  DEPENDS:=+libbpf +libelf +libjson-c +libuci +libmnl +libnftnl +tc-full +kmod-xdpi $(BPF_DEPENDS)
+  DEPENDS:=+libbpf +libelf +libjson-c +libuci +libmnl +libnftnl +tc-full +bpftool-minimal +ip +kmod-xdpi $(BPF_DEPENDS)
   URL:=https://github.com/liudf0716/aw-bpf
 endef
 
