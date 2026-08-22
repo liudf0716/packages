@@ -1,12 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=clawwrt
-PKG_VERSION:=0.1.6
+PKG_VERSION:=0.08.57
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=0cfe1247f18b4b25720d5765908b6e15686c222f35046f913a8c1fd9b640efb0
+PKG_HASH:=c37de270f586827f7d71176211944db3f48dfc6bf5d848dfac6497ef05a3f4c7
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
