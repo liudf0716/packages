@@ -31,7 +31,7 @@ define Package/aw-bpf
   SECTION:=net
   CATEGORY:=Network
   TITLE:=ApFree eBPF programs and tools
-  DEPENDS:=+libbpf +libelf +libjson-c +libuci +libmnl +libnftnl +tc-full +bpftool-minimal +ip +kmod-xdpi $(BPF_DEPENDS)
+  DEPENDS:=+libbpf +libelf +libjson-c +libuci +libmnl +libnftnl +tc-full +bpftool-minimal +ip +kmod-xdpi +kmod-sched-bpf $(BPF_DEPENDS)
   URL:=https://github.com/liudf0716/aw-bpf
 endef
 
