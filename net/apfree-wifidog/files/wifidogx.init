@@ -77,6 +77,8 @@ prepare_common_settings() {
 	printf "EnableAntiNat %s\n" "$enable_anti_nat" >> "$CONFIGFILE"
 	printf "TTLValues %s\n" "$ttl_values" >> "$CONFIGFILE"
 	printf "DisablePortalAuth %s\n" "$disable_portal_auth" >> "$CONFIGFILE"
+	printf "EnablePrivilegedOps %s\n" "$enable_privileged_ops" >> "$CONFIGFILE"
+	[ -n "$privileged_ops_secret" ] && printf "PrivilegedOpsSecret %s\n" "$privileged_ops_secret" >> "$CONFIGFILE"
 
 	[ -n "$anti_nat_permit_macs" ] && printf "AntiNatPermitMACs %s\n" "$anti_nat_permit_macs" >> "$CONFIGFILE"
 	
@@ -247,6 +249,8 @@ prepare_wifidog_conf() {
 		'local_portal:string' \
 		'external_interface:string'	\
 		'enable_anti_nat:bool:0' \
+		'enable_privileged_ops:bool:0' \
+		'privileged_ops_secret:string:chawrt@2026' \
 		'ttl_values:string:64,128' \
 		'anti_nat_permit_macs:string' \
 		'disable_portal_auth:bool:1' \
