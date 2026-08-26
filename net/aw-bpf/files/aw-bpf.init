@@ -5,11 +5,11 @@
 START=98
 USE_PROCD=1
 NAME=aw-bpf
-PROG="/usr/bin/event_daemon"
+PROG="/usr/bin/aw-eventd"
 BPF_FS_ROOT="/sys/fs/bpf"
 AW_BPF_PIN_DIR="$BPF_FS_ROOT/tc/globals"
 AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
-AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_stats_map"
+AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_ringbuf_portal dns_stats_map"
 AW_BPF_PROGS="tc_ingress tc_egress"
 AW_BPF_LAN_IFACES=""
 AW_BPF_WAN_IFACES=""
@@ -193,6 +193,7 @@ load_dns_bpf_program() {
 	local xdp_prog_id=$(bpftool prog show name xdp_dns_monitor 2>/dev/null | head -n1 | cut -d':' -f1)
 	if [ -n "$xdp_prog_id" ]; then
 		[ ! -e "$xdp_pin_base/dns_ringbuf" ] && bpftool map pin name dns_ringbuf "$xdp_pin_base/dns_ringbuf" 2>/dev/null
+		[ ! -e "$xdp_pin_base/dns_ringbuf_portal" ] && bpftool map pin name dns_ringbuf_portal "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null
 		[ ! -e "$xdp_pin_base/dns_stats_map" ] && bpftool map pin name dns_stats_map "$xdp_pin_base/dns_stats_map" 2>/dev/null
 	fi
 
@@ -254,9 +255,8 @@ start_service() {
 	load_xdpi
 	load_bpf_resources
 
-	# Check if event_daemon binary exists first
 	if ! command -v "$PROG" >/dev/null 2>&1; then
-		echo "event_daemon binary not found" >&2
+		echo "aw-eventd binary not found" >&2
 		return 1
 	fi
 	
@@ -269,7 +269,7 @@ start_service() {
 		return
 	fi
 
-	echo "Starting aw-bpf service (event_daemon)" >&2
+	echo "Starting aw-bpf service (aw-eventd)" >&2
 	procd_open_instance
 	procd_set_param command "$PROG"
 	procd_set_param respawn

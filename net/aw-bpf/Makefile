@@ -37,8 +37,8 @@ endef
 
 define Package/aw-bpf/description
 	ApFree eBPF provides eBPF programs for session tracking, xDPI, DNS monitoring
-	and user-space tools: aw-bpfctl (control CLI) and event_daemon (session / access
-	logging daemon that consumes session_events_map and writes JSON syslog).
+	and user-space tools: aw-bpfctl (control CLI) and aw-eventd (session / DNS
+	consumer with independent nftables table inet awbpf).
 endef
 
 
@@ -65,8 +65,8 @@ endef
 define Package/aw-bpf/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/aw-bpfctl $(1)/usr/bin/aw-bpfctl
-	# event_daemon: session event consumer for access logging (上网日志)
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/event_daemon $(1)/usr/bin/event_daemon
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/aw-eventd $(1)/usr/bin/aw-eventd
+	ln -sf aw-eventd $(1)/usr/bin/event_daemon
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/aw-bpf.init $(1)/etc/init.d/aw-bpf
 	$(INSTALL_DIR) $(1)/etc/config
