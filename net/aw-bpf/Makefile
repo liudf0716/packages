@@ -13,7 +13,7 @@ PKG_RELEASE:=3
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=3dee6e1d5c9509790b933a15448d0a0c5d8a152e2e54ecd92270f36c92be358e
+PKG_HASH:=60877de26cf327e94f916382cf07fb893b0bdd437fbcb8bf4524632c0e43a25a
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -31,7 +31,7 @@ define Package/aw-bpf
   SECTION:=net
   CATEGORY:=Network
   TITLE:=ApFree eBPF programs and tools
-  DEPENDS:=+libbpf +libelf +libjson-c +libuci +libmnl +libnftnl +tc-full +bpftool-minimal +ip +kmod-xdpi +kmod-sched-bpf $(BPF_DEPENDS)
+  DEPENDS:=+libbpf +libelf +libjson-c +libmnl +libnftnl +tc-full +bpftool-minimal +ip +kmod-xdpi +kmod-sched-bpf $(BPF_DEPENDS)
   URL:=https://github.com/liudf0716/aw-bpf
 endef
 
@@ -46,15 +46,15 @@ define KernelPackage/xdpi
   SECTION:=kernel
   SUBMENU:=Network Support
   TITLE:=xdpi ebpf module
-  FILES:=$(PKG_BUILD_DIR)/xdpi-bpf.ko
-  AUTOLOAD:=$(call AutoProbe,xdpi)
+  FILES:=$(PKG_BUILD_DIR)/xdpi_bpf.ko
+  AUTOLOAD:=$(call AutoProbe,xdpi_bpf)
 endef
 
-# Build cmake userspace first (aw-bpfctl, event_daemon), then BPF objects and kmod.
+# Build cmake userspace first (aw-bpfctl, aw-eventd), then BPF objects and kmod.
 define Build/Compile
 	$(call Build/Compile/Default)
-	$(call CompileBPF,$(PKG_BUILD_DIR)/aw-bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
-	$(call CompileBPF,$(PKG_BUILD_DIR)/dns-bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
+	$(call CompileBPF,$(PKG_BUILD_DIR)/aw_bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
+	$(call CompileBPF,$(PKG_BUILD_DIR)/dns_bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
 	$(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
 endef
 
@@ -66,14 +66,13 @@ define Package/aw-bpf/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/aw-bpfctl $(1)/usr/bin/aw-bpfctl
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/aw-eventd $(1)/usr/bin/aw-eventd
-	ln -sf aw-eventd $(1)/usr/bin/event_daemon
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/aw-bpf.init $(1)/etc/init.d/aw-bpf
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/aw-bpf.conf $(1)/etc/config/aw-bpf
 	$(INSTALL_DIR) $(1)/lib/bpf
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/aw-bpf.o $(1)/lib/bpf/aw-bpf.o
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/dns-bpf.o $(1)/lib/bpf/dns-bpf.o
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/aw_bpf.o $(1)/lib/bpf/aw-bpf.o
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/dns_bpf.o $(1)/lib/bpf/dns-bpf.o
 endef
 
 $(eval $(call BuildPackage,aw-bpf))
