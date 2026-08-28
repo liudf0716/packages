@@ -190,11 +190,12 @@ load_dns_bpf_program() {
 	sleep 1
 
 	local xdp_prog_id=$(bpftool prog show name xdp_dns_monitor 2>/dev/null | head -n1 | cut -d':' -f1)
-	if [ -n "$xdp_prog_id" ]; then
 		[ ! -e "$xdp_pin_base/dns_ringbuf" ] && bpftool map pin name dns_ringbuf "$xdp_pin_base/dns_ringbuf" 2>/dev/null
-		[ ! -e "$xdp_pin_base/dns_ringbuf_portal" ] && bpftool map pin name dns_ringbuf_portal "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null
+		if [ ! -e "$xdp_pin_base/dns_ringbuf_portal" ]; then
+			bpftool map pin name dns_ringbuf_por "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
+			bpftool map pin name dns_ringbuf_portal "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null
+		fi
 		[ ! -e "$xdp_pin_base/dns_stats_map" ] && bpftool map pin name dns_stats_map "$xdp_pin_base/dns_stats_map" 2>/dev/null
-	fi
 
 	return 0
 }
