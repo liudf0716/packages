@@ -22,6 +22,7 @@ append_toml_global() {
 
 	[ -z "$remote_addr" ] || echo "remote_addr = \"$remote_addr\"" >> "$outfile"
 	[ -z "$remote_port" ] || echo "remote_port = $remote_port" >> "$outfile"
+	[ -z "$key" ] || echo "key = \"$key\"" >> "$outfile"
 	[ -z "$local_interface" ] || echo "local_interface = \"$local_interface\"" >> "$outfile"
 	[ -z "$local_port" ] || echo "local_port = $local_port" >> "$outfile"
 	[ -z "$mode" ] || echo "mode = \"$mode\"" >> "$outfile"
@@ -66,6 +67,7 @@ EOF
 	[ -z "$target_addr" ] || echo "target_addr = \"$target_addr\"" >> "$outfile"
 	[ -z "$remote_addr" ] || echo "remote_addr = \"$remote_addr\"" >> "$outfile"
 	[ -z "$remote_port" ] || echo "remote_port = $remote_port" >> "$outfile"
+	[ -z "$key" ] || echo "key = \"$key\"" >> "$outfile"
 	[ -z "$mode" ] || echo "mode = \"$mode\"" >> "$outfile"
 	[ -z "$mtu" ] || echo "mtu = $mtu" >> "$outfile"
 	[ -z "$sndwnd" ] || echo "sndwnd = $sndwnd" >> "$outfile"
@@ -207,6 +209,7 @@ validate_common_options() {
 		'sockbuf:uinteger' \
 		'keepalive:uinteger' \
 		'conntimeout:uinteger' \
+		'key:string' \
 		'syslog:bool:1' \
 		'user:string'
 }
