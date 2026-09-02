@@ -63,6 +63,7 @@ name = "${name:-$cfg}"
 local_interface = "${local_interface:-br-lan}"
 local_port = $local_port
 EOF
+	[ -z "$proto" ] || echo "proto = \"$proto\"" >> "$outfile"
 	[ -z "$target_port" ] || echo "target_port = $target_port" >> "$outfile"
 	[ -z "$target_addr" ] || echo "target_addr = \"$target_addr\"" >> "$outfile"
 	[ -z "$remote_addr" ] || echo "remote_addr = \"$remote_addr\"" >> "$outfile"
@@ -235,6 +236,7 @@ validate_client_options() {
 	validate_common_options client "$1" "$2" \
 		'local_interface:string:br-lan' \
 		'local_port:port:9088' \
+		'proto:or("tcp", "udp")' \
 		'target_addr:host' \
 		'target_port:port' \
 		'remote_addr:host' \
