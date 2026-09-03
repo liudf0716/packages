@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=xdns-bpf
-PKG_VERSION:=0.09.10
+PKG_VERSION:=0.09.11
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=b7714b2427b6593917ce3d03d962bc7b3722d1286bd566ccb12a7169522549be
+PKG_HASH:=c016c2df98b3aefcb94d186fb962767d70370cb2bd2aae8d37ec75cee2bc29a5
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -42,7 +42,7 @@ endef
 
 define Package/xdns-bpf/conffiles
 /etc/config/xdns
-/etc/xdns/whitelist.txt
+/etc/xdns/proxy_domains.txt
 endef
 
 define Build/Compile
@@ -64,7 +64,7 @@ define Package/xdns-bpf/install
 	$(INSTALL_BIN) ./files/xdns.init $(1)/etc/init.d/xdns
 
 	$(INSTALL_DIR) $(1)/etc/xdns
-	$(INSTALL_DATA) ./files/whitelist.txt $(1)/etc/xdns/whitelist.txt
+	$(INSTALL_DATA) ./files/proxy_domains.txt $(1)/etc/xdns/proxy_domains.txt
 endef
 
 $(eval $(call BuildPackage,xdns-bpf))
