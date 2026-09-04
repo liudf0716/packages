@@ -51,8 +51,8 @@ start_service() {
 
 	# Attach xdns_bpf at pref 1
 	# Non-proxied traffic returns TC_ACT_UNSPEC and cleanly falls through to pref 2 (aw-bpf)
-	tc filter replace dev "$ifname" ingress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec classifier/ingress
-	tc filter replace dev "$ifname" egress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec classifier/egress
+	tc filter replace dev "$ifname" ingress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec tc/ingress
+	tc filter replace dev "$ifname" egress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec tc/egress
 
 	# Initialize runtime config map
 	$CTL set-config "$xkcp_dns" "$xkcp_tcp" 1
