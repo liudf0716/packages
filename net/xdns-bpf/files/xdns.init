@@ -49,6 +49,18 @@ start_service() {
 		fi
 	fi
 
+	# Netfilter fast path: packets hijacked (DNAT/reverse-SNAT) by xdns_bpf
+	# carry skb mark 0x58444e53 ("XDNS"). Exempt them from conntrack at raw
+	# priority so redirected flows do not pay for duplicate state tracking
+	# (xdns_bpf keeps its own session table and does the NAT itself).
+	# NOTE: remove this table if steering is ever switched to plain nftables
+	# DNAT (conntrack-based), otherwise replies would not be de-NATed.
+	nft add table inet xdns_skip 2>/dev/null || true
+	nft add chain inet xdns_skip pre '{ type filter hook prerouting priority raw; policy accept; }' 2>/dev/null || true
+	nft add rule inet xdns_skip pre meta mark 1480871507 notrack 2>/dev/null || true
+	nft add chain inet xdns_skip out '{ type filter hook output priority raw; policy accept; }' 2>/dev/null || true
+	nft add rule inet xdns_skip out meta mark 1480871507 notrack 2>/dev/null || true
+
 	# Attach xdns_bpf at pref 1
 	# Non-proxied traffic returns TC_ACT_UNSPEC and cleanly falls through to pref 2 (aw-bpf)
 	tc filter replace dev "$ifname" ingress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec tc/ingress
@@ -69,6 +81,7 @@ stop_service() {
 	load_config
 	tc filter del dev "$ifname" ingress pref 1 2>/dev/null || true
 	tc filter del dev "$ifname" egress pref 1 2>/dev/null || true
+	nft delete table inet xdns_skip 2>/dev/null || true
 
 	# Move aw-bpf back to pref 1 if present at pref 2
 	if tc filter show dev "$ifname" ingress pref 2 2>/dev/null | grep -q "aw-bpf"; then
