@@ -196,10 +196,11 @@ validate_common_options() {
 	local cfgtype="$1"; shift
 	local cfg="$1"; shift
 	local func="$1"; shift
+	local enabled_def="${1:-1}"; shift
 	local mode_profiles='"fast3", "fast2", "fast", "normal", "manual"'
 
 	"${func:-validate}" "$cfgtype" "$cfg" "$@" \
-		'enabled:bool:1' \
+		"enabled:bool:$enabled_def" \
 		'name:string' \
 		"mode:or($mode_profiles)" \
 		'mtu:uinteger' \
@@ -224,8 +225,10 @@ validate_common_options() {
 }
 
 validate_global_options() {
-	validate_common_options global "$1" "$2" \
-		'enabled:bool:0' \
+	local enabled_def=0
+	[ "$1" = "client" ] && enabled_def=1
+
+	validate_common_options global "$1" "$2" "$enabled_def" \
 		'remote_addr:host' \
 		'remote_port:port' \
 		'local_interface:string' \
@@ -233,7 +236,7 @@ validate_global_options() {
 }
 
 validate_server_options() {
-	validate_common_options server "$1" "$2" \
+	validate_common_options server "$1" "$2" 1 \
 		'local_interface:string:eth0' \
 		'local_port:port:9089' \
 		'target_addr:host' \
@@ -241,7 +244,7 @@ validate_server_options() {
 }
 
 validate_client_options() {
-	validate_common_options client "$1" "$2" \
+	validate_common_options client "$1" "$2" 1 \
 		'local_interface:string:br-lan' \
 		'local_port:port:9088' \
 		'proto:or("tcp", "udp")' \
