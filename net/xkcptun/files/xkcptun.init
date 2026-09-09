@@ -130,7 +130,7 @@ EOF
 
 	if [ "$cfgtype" = "client" ]; then
 		local cli_enabled
-		config_get_bool cli_enabled client enabled 1
+		config_get_bool cli_enabled client enabled 0
 		if [ "$cli_enabled" -ne 1 ] || [ "$count" -eq 0 ]; then
 			rm -f "$conftoml"
 			return
@@ -225,10 +225,7 @@ validate_common_options() {
 }
 
 validate_global_options() {
-	local enabled_def=0
-	[ "$1" = "client" ] && enabled_def=1
-
-	validate_common_options global "$1" "$2" "$enabled_def" \
+	validate_common_options global "$1" "$2" 0 \
 		'remote_addr:host' \
 		'remote_port:port' \
 		'local_interface:string' \
