@@ -9,11 +9,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
 PKG_VERSION:=1.08.23
-PKG_RELEASE:=3
+PKG_RELEASE:=5
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=60edc45f83535c4916907a0985cdfa1b971c533a1f9cab49b0c557e327009148
+PKG_HASH:=0742b63d435c407c59c6051e988e439172910a624d4361db451e3c4b0b60e5c5
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -50,8 +50,15 @@ define KernelPackage/xdpi
   AUTOLOAD:=$(call AutoProbe,xdpi_bpf)
 endef
 
+define Build/Prepare
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) /media/windows/github/wifidogx/aw-bpf/* $(PKG_BUILD_DIR)/
+endef
+
+
 # Build cmake userspace first (aw-bpfctl, aw-eventd), then BPF objects and kmod.
 define Build/Compile
+
 	$(call Build/Compile/Default)
 	$(call CompileBPF,$(PKG_BUILD_DIR)/aw_bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
 	$(call CompileBPF,$(PKG_BUILD_DIR)/dns_bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))

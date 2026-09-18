@@ -10,8 +10,8 @@ PROG="/usr/bin/aw-eventd"
 CONF_FILE="/var/etc/eventd.conf"
 BPF_FS_ROOT="/sys/fs/bpf"
 AW_BPF_PIN_DIR="$BPF_FS_ROOT/tc/globals"
-AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
-AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_ringbuf_portal dns_stats_map"
+AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_portal_buf dns_ringbuf_portal dns_stats_map captive_domain_map xdpi_config_map fastpath_config_map fastpath_flow_map fastpath_ip_mac_map fastpath_out_tracker_map router_ip_map ipv4_qos_map ipv6_qos_map mac_qos_map xdpi_l7_qos_map"
+
 AW_BPF_PROGS="tc_ingress tc_egress"
 AW_BPF_LAN_IFACES=""
 AW_BPF_WAN_IFACES=""
@@ -131,10 +131,31 @@ load_bpf_resources() {
 		attach_tc_programs "$iface" || return 1
 	done
 
-	load_dns_bpf_program
+	resolve_wan_ifaces
+	for iface in $AW_BPF_WAN_IFACES; do
+		attach_tc_programs "$iface" || true
+	done
+
+	sync_router_ips
+	load_dns_bpf_program || true
 
 	return 0
 }
+
+sync_router_ips() {
+	resolve_lan_ifaces
+	resolve_wan_ifaces
+	local lan_dev=$(echo $AW_BPF_LAN_IFACES | awk '{print $1}')
+	local wan_dev=$(echo $AW_BPF_WAN_IFACES | awk '{print $1}')
+	[ -z "$lan_dev" ] && lan_dev="br-lan"
+	[ -z "$wan_dev" ] && wan_dev="eth1"
+	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
+	if [ -x "$ctl" ]; then
+		echo "Syncing router IP addresses for $lan_dev and $wan_dev..." >&2
+		"$ctl" router-ip sync "$lan_dev" "$wan_dev" || echo "Warning: failed to sync router IP addresses" >&2
+	fi
+}
+
 
 load_xdpi() {
 	if lsmod | grep -q xdpi; then
@@ -192,10 +213,18 @@ load_dns_bpf_program() {
 	local xdp_prog_id=$(bpftool prog show name xdp_dns_monitor 2>/dev/null | head -n1 | cut -d':' -f1)
 		[ ! -e "$xdp_pin_base/dns_ringbuf" ] && bpftool map pin name dns_ringbuf "$xdp_pin_base/dns_ringbuf" 2>/dev/null
 		if [ ! -e "$xdp_pin_base/dns_ringbuf_portal" ]; then
+			bpftool map pin name dns_portal_buf "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
 			bpftool map pin name dns_ringbuf_por "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
 			bpftool map pin name dns_ringbuf_portal "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null
 		fi
+		[ ! -e "$xdp_pin_base/dns_portal_buf" ] && bpftool map pin name dns_portal_buf "$xdp_pin_base/dns_portal_buf" 2>/dev/null || true
 		[ ! -e "$xdp_pin_base/dns_stats_map" ] && bpftool map pin name dns_stats_map "$xdp_pin_base/dns_stats_map" 2>/dev/null
+		if [ -e "$AW_BPF_PIN_DIR/dns_portal_buf" ] && [ ! -e "$AW_BPF_PIN_DIR/dns_ringbuf_portal" ]; then
+			ln -sf "$AW_BPF_PIN_DIR/dns_portal_buf" "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
+		fi
+		if [ ! -e "$AW_BPF_PIN_DIR/dns_ringbuf_portal" ]; then
+			bpftool map pin name dns_portal_buf "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
+		fi
 
 	return 0
 }
@@ -210,8 +239,10 @@ cleanup_bpf_resources() {
 	
 	resolve_wan_ifaces
 	for iface in $AW_BPF_WAN_IFACES; do
+		detach_tc_programs "$iface"
 		ip link set dev "$iface" xdp off 2>/dev/null || true
 	done
+
 
 	rm -rf /sys/fs/bpf/aw/dns_* 2>/dev/null
 	cleanup_aw_bpf_pins
@@ -244,11 +275,14 @@ unload_xdpi() {
 }
 
 generate_conf() {
-	local enable_event_log
+	local enable_event_log enable_qos qos_down qos_up
 	local location_id ap_device_id ap_mac_address ap_longitude ap_latitude
 
 	config_load "aw-bpf"
 	config_get enable_event_log "common" enable_event_log "0"
+	config_get enable_qos "common" enable_qos "0"
+	config_get qos_down "common" qos_down "0"
+	config_get qos_up "common" qos_up "0"
 	config_get location_id "common" location_id ""
 	config_get ap_device_id "common" ap_device_id ""
 	config_get ap_mac_address "common" ap_mac_address ""
@@ -258,6 +292,7 @@ generate_conf() {
 	# Inherit location/device audit info from wifidogx if not explicitly set in aw-bpf
 	if [ -f "/etc/config/wifidogx" ]; then
 		local w_loc w_dev w_mac w_long w_lat
+		local w_qos w_down w_up
 		config_load "wifidogx"
 		config_get w_loc "common" location_id ""
 		config_get w_dev "common" ap_device_id ""
@@ -270,8 +305,26 @@ generate_conf() {
 		[ -z "$ap_mac_address" ] && ap_mac_address="$w_mac"
 		[ -z "$ap_longitude" ] && ap_longitude="$w_long"
 		[ -z "$ap_latitude" ] && ap_latitude="$w_lat"
+
+		# Also inherit QoS settings if not set in aw-bpf
+		if [ "$enable_qos" = "0" ] || [ -z "$enable_qos" ]; then
+			config_get w_qos "wifidogx" enable_qos ""
+			[ -z "$w_qos" ] && config_get w_qos "common" enable_qos "0"
+			if [ "$w_qos" = "1" ]; then
+				enable_qos="1"
+				config_get w_down "wifidogx" qos_down ""
+				[ -z "$w_down" ] && config_get w_down "common" qos_down "0"
+				qos_down="$w_down"
+				config_get w_up "wifidogx" qos_up ""
+				[ -z "$w_up" ] && config_get w_up "common" qos_up "0"
+				qos_up="$w_up"
+			fi
+		fi
 	fi
 
+	[ -z "$enable_qos" ] && enable_qos="0"
+	[ -z "$qos_down" ] && qos_down="0"
+	[ -z "$qos_up" ] && qos_up="0"
 	[ -z "$location_id" ] && location_id="UNKNOWN"
 	[ -z "$ap_device_id" ] && ap_device_id="UNKNOWN"
 	[ -z "$ap_mac_address" ] && ap_mac_address="UNKNOWN"
@@ -282,6 +335,9 @@ generate_conf() {
 	cat > "$CONF_FILE" <<EOF
 # Generated automatically by /etc/init.d/aw-bpf from UCI
 enable_event_log=${enable_event_log}
+enable_qos=${enable_qos}
+qos_down=${qos_down}
+qos_up=${qos_up}
 location_id=${location_id}
 ap_device_id=${ap_device_id}
 ap_mac_address=${ap_mac_address}
