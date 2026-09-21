@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
-PKG_VERSION:=1.08.23
-PKG_RELEASE:=6
+PKG_VERSION:=2.9.53
+PKG_RELEASE:=1
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=0742b63d435c407c59c6051e988e439172910a624d4361db451e3c4b0b60e5c5
+PKG_HASH:=94ab8cbf444b28c581b5725beb4cc3e0c3e4ed28ed8c38ae500bcf3655eb7ce9
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -26,6 +26,8 @@ include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 include $(INCLUDE_DIR)/bpf.mk
 include $(INCLUDE_DIR)/kernel.mk
+
+CMAKE_OPTIONS += -DAW_BPF_VERSION=$(PKG_VERSION)
 
 define Package/aw-bpf
   SECTION:=net
@@ -80,6 +82,31 @@ define Package/aw-bpf/install
 	$(INSTALL_DIR) $(1)/lib/bpf
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/aw_bpf.o $(1)/lib/bpf/aw-bpf.o
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/dns_bpf.o $(1)/lib/bpf/dns-bpf.o
+endef
+
+define Package/aw-bpf/postinst
+#!/bin/sh
+if [ -z "$${IPKG_INSTROOT}" ]; then
+	if [ -f /etc/init.d/aw-bpf.apk-new ]; then
+		mv -f /etc/init.d/aw-bpf.apk-new /etc/init.d/aw-bpf
+		chmod 0755 /etc/init.d/aw-bpf
+	fi
+	if [ "$${PKG_UPGRADE}" = "1" ]; then
+		/etc/init.d/aw-bpf restart
+	fi
+fi
+exit 0
+endef
+
+define Package/aw-bpf/prerm
+#!/bin/sh
+if [ -z "$${IPKG_INSTROOT}" ]; then
+	if [ "$${PKG_UPGRADE}" != "1" ]; then
+		/etc/init.d/aw-bpf stop
+		/etc/init.d/aw-bpf disable
+	fi
+fi
+exit 0
 endef
 
 $(eval $(call BuildPackage,aw-bpf))
