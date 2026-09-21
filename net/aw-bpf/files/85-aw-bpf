@@ -1,0 +1,22 @@
+#!/bin/sh
+# Copyright (C) 2025-2026 Dengfeng Liu
+# Hotplug script for aw-bpf: keep TC, XDP, router IPs, and FastPath in sync with interface state
+
+case "$ACTION" in
+	ifup)
+		[ -x /etc/init.d/aw-bpf ] || exit 0
+		[ -d /sys/fs/bpf ] || exit 0
+
+		# Re-sync aw-bpf on LAN or WAN interface up/reload
+		if [ "$INTERFACE" = "lan" ] || [ "$INTERFACE" = "wan" ] || \
+		   [ "$DEVICE" = "br-lan" ] || [ "$DEVICE" = "eth1" ]; then
+			/etc/init.d/aw-bpf reload_network >/dev/null 2>&1 || true
+		fi
+		;;
+	ifdown)
+		# Flush fastpath flow table on WAN link down so stale NAT flows don't linger
+		if [ "$INTERFACE" = "wan" ] || [ "$DEVICE" = "eth1" ]; then
+			command -v aw-bpfctl >/dev/null 2>&1 && aw-bpfctl fastpath flush >/dev/null 2>&1 || true
+		fi
+		;;
+esac
