@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
 PKG_VERSION:=1.08.23
-PKG_RELEASE:=5
+PKG_RELEASE:=6
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?

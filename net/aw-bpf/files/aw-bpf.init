@@ -10,6 +10,7 @@ PROG="/usr/bin/aw-eventd"
 CONF_FILE="/var/etc/eventd.conf"
 BPF_FS_ROOT="/sys/fs/bpf"
 AW_BPF_PIN_DIR="$BPF_FS_ROOT/tc/globals"
+AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
 AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_portal_buf dns_ringbuf_portal dns_stats_map captive_domain_map xdpi_config_map fastpath_config_map fastpath_flow_map fastpath_ip_mac_map fastpath_out_tracker_map router_ip_map ipv4_qos_map ipv6_qos_map mac_qos_map xdpi_l7_qos_map"
 
 AW_BPF_PROGS="tc_ingress tc_egress"
@@ -111,13 +112,16 @@ cleanup_aw_bpf_pins() {
 	for entry in $AW_BPF_PROGS $AW_BPF_MAPS; do
 		[ -e "$BPF_FS_ROOT/$entry" ] && rm -f "$BPF_FS_ROOT/$entry"
 		[ -e "$AW_BPF_PIN_DIR/$entry" ] && rm -f "$AW_BPF_PIN_DIR/$entry"
-		[ -e "$AW_BPF_LEGACY_PIN_DIR/$entry" ] && rm -f "$AW_BPF_LEGACY_PIN_DIR/$entry"
+		[ -n "$AW_BPF_LEGACY_PIN_DIR" ] && [ -e "$AW_BPF_LEGACY_PIN_DIR/$entry" ] && rm -f "$AW_BPF_LEGACY_PIN_DIR/$entry"
 	done
 }
 
 load_bpf_resources() {
 	echo "Loading BPF resources..." >&2
 	mkdir -p "$AW_BPF_PIN_DIR" 2>/dev/null || true
+
+	# Ensure conntrack accepts out-of-window packets when transitioning from FastPath
+	sysctl -w net.netfilter.nf_conntrack_tcp_be_liberal=1 >/dev/null 2>&1 || true
 
 	cleanup_aw_bpf_pins
 	resolve_lan_ifaces
@@ -138,8 +142,36 @@ load_bpf_resources() {
 
 	sync_router_ips
 	load_dns_bpf_program || true
+	sync_fastpath || true
 
 	return 0
+}
+
+sync_fastpath() {
+	local enable_fastpath
+	config_load "aw-bpf"
+	config_get enable_fastpath "common" enable_fastpath "0"
+	if [ "$enable_fastpath" = "1" ]; then
+		resolve_lan_ifaces
+		resolve_wan_ifaces
+		local lan_dev=$(echo $AW_BPF_LAN_IFACES | awk '{print $1}')
+		local wan_dev=$(echo $AW_BPF_WAN_IFACES | awk '{print $1}')
+		[ -z "$lan_dev" ] && lan_dev="br-lan"
+		[ -z "$wan_dev" ] && wan_dev="eth1"
+		local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
+		if [ -x "$ctl" ]; then
+			echo "Syncing FastPath for $lan_dev and $wan_dev..." >&2
+			local retry=0
+			while [ $retry -lt 5 ]; do
+				if "$ctl" fastpath enable "$lan_dev" "$wan_dev"; then
+					return 0
+				fi
+				retry=$((retry + 1))
+				sleep 1
+			done
+			echo "Warning: failed to enable FastPath after retries" >&2
+		fi
+	fi
 }
 
 sync_router_ips() {
@@ -197,16 +229,43 @@ load_dns_bpf_program() {
 		return 1
 	fi
 
+	local current_hash=""
+	[ -f "$dns_bpf_file" ] && current_hash=$(md5sum "$dns_bpf_file" 2>/dev/null | awk '{print $1}')
+	local attached_hash=""
+	[ -f "/var/run/aw-bpf.dns_xdp.md5" ] && attached_hash=$(cat /var/run/aw-bpf.dns_xdp.md5 2>/dev/null)
+
 	for iface in $AW_BPF_WAN_IFACES; do
-		echo "Attaching DNS XDP program to $iface..." >&2
-		ip link set dev "$iface" xdp off 2>/dev/null || true
-		if ! ip link set dev "$iface" xdp obj "$dns_bpf_file" sec xdp 2>/tmp/aw-bpf.xdp.err; then
-			echo "Failed to attach dns xdp to $iface: $(cat /tmp/aw-bpf.xdp.err 2>/dev/null)" >&2
-			rm -f /tmp/aw-bpf.xdp.err
-			return 1
+		local need_attach=1
+		if ip link show dev "$iface" 2>/dev/null | grep -q "xdp_dns_monitor"; then
+			if [ -n "$current_hash" ] && [ "$current_hash" = "$attached_hash" ]; then
+				if [ -e "$xdp_pin_base/dns_ringbuf" ] && \
+				   { [ -e "$xdp_pin_base/dns_ringbuf_portal" ] || [ -e "$xdp_pin_base/dns_portal_buf" ]; }; then
+					echo "DNS XDP program already attached to $iface and up-to-date, skipping." >&2
+					need_attach=0
+				else
+					echo "DNS XDP program attached to $iface but map pins missing, re-attaching..." >&2
+				fi
+			else
+				echo "DNS XDP program on $iface is outdated or upgraded, updating..." >&2
+			fi
 		fi
-		rm -f /tmp/aw-bpf.xdp.err
+
+		if [ "$need_attach" = "1" ]; then
+			echo "Attaching DNS XDP program to $iface..." >&2
+			if ! ip link set dev "$iface" xdp obj "$dns_bpf_file" sec xdp 2>/tmp/aw-bpf.xdp.err; then
+				# Fallback: if in-place replace is unsupported by driver, detach then attach
+				ip link set dev "$iface" xdp off 2>/dev/null || true
+				if ! ip link set dev "$iface" xdp obj "$dns_bpf_file" sec xdp 2>/tmp/aw-bpf.xdp.err; then
+					echo "Failed to attach dns xdp to $iface: $(cat /tmp/aw-bpf.xdp.err 2>/dev/null)" >&2
+					rm -f /tmp/aw-bpf.xdp.err
+					return 1
+				fi
+			fi
+			rm -f /tmp/aw-bpf.xdp.err
+		fi
 	done
+
+	[ -n "$current_hash" ] && echo "$current_hash" > /var/run/aw-bpf.dns_xdp.md5
 
 	sleep 1
 
@@ -226,6 +285,11 @@ load_dns_bpf_program() {
 			bpftool map pin name dns_portal_buf "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
 		fi
 
+	if [ ! -e "$xdp_pin_base/dns_ringbuf" ]; then
+		echo "Warning: failed to ensure dns_ringbuf pin under $xdp_pin_base" >&2
+		return 1
+	fi
+
 	return 0
 }
 
@@ -238,13 +302,21 @@ cleanup_bpf_resources() {
 	done
 	
 	resolve_wan_ifaces
+	local xdp_active=0
 	for iface in $AW_BPF_WAN_IFACES; do
 		detach_tc_programs "$iface"
-		ip link set dev "$iface" xdp off 2>/dev/null || true
+		# Do not detach XDP on routine stop to avoid resetting PHY and flapping WAN link
+		if ip link show dev "$iface" 2>/dev/null | grep -q "xdp_dns_monitor"; then
+			xdp_active=1
+		fi
 	done
 
+	# Only remove DNS XDP map pins if XDP is not active
+	if [ "$xdp_active" = "0" ]; then
+		rm -rf /sys/fs/bpf/aw/dns_* 2>/dev/null
+		rm -f /var/run/aw-bpf.dns_xdp.md5 2>/dev/null
+	fi
 
-	rm -rf /sys/fs/bpf/aw/dns_* 2>/dev/null
 	cleanup_aw_bpf_pins
 
 	return 0
