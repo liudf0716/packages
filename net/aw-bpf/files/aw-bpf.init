@@ -11,7 +11,7 @@ CONF_FILE="/var/etc/eventd.conf"
 BPF_FS_ROOT="/sys/fs/bpf"
 AW_BPF_PIN_DIR="$BPF_FS_ROOT/tc/globals"
 AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
-AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_portal_buf dns_ringbuf_portal dns_stats_map captive_domain_map xdpi_config_map fastpath_config_map fastpath_flow_map fastpath_ip_mac_map fastpath_out_tracker_map router_ip_map ipv4_qos_map ipv6_qos_map mac_qos_map xdpi_l7_qos_map"
+AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_portal_buf dns_ringbuf_portal dns_stats_map captive_domain_map xdpi_config_map fastpath_config_map fastpath_flow_map fastpath_ip_mac_map fastpath_out_tracker_map router_ip_map ipv4_qos_map ipv6_qos_map mac_qos_map xdpi_l7_qos_map captive_reinject_map"
 
 AW_BPF_PROGS="tc_ingress tc_egress"
 AW_BPF_LAN_IFACES=""
