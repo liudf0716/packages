@@ -20,11 +20,31 @@ AW_BPF_LAN_IFACES=""
 AW_BPF_WAN_IFACES=""
 
 resolve_lan_ifaces() {
-	local lan_device lan_ifname
-
 	AW_BPF_LAN_IFACES=""
 
+	# 1. Check user-configured override in aw-bpf
+	local configured_lan
+	config_load "aw-bpf"
+	config_get configured_lan "common" lan_dev ""
+	if [ -n "$configured_lan" ] && [ -e "/sys/class/net/$configured_lan" ]; then
+		AW_BPF_LAN_IFACES="$configured_lan"
+		return 0
+	fi
+
+	# 2. Query dynamic netifd device via network.sh
+	local net_dev
+	if [ -f /lib/functions/network.sh ]; then
+		. /lib/functions/network.sh
+		network_get_device net_dev "lan" || network_get_physdev net_dev "lan"
+		if [ -n "$net_dev" ] && [ -e "/sys/class/net/$net_dev" ]; then
+			AW_BPF_LAN_IFACES="$net_dev"
+			return 0
+		fi
+	fi
+
+	# 3. Fallback to static UCI network.lan definition
 	config_load network
+	local lan_device lan_ifname
 	config_get lan_device lan device
 	config_get lan_ifname lan ifname
 
@@ -39,14 +59,40 @@ resolve_lan_ifaces() {
 			return 0
 		fi
 	done
+
+	# 4. Standard default bridge fallback
+	if [ -e "/sys/class/net/br-lan" ]; then
+		AW_BPF_LAN_IFACES="br-lan"
+		return 0
+	fi
 }
 
 resolve_wan_ifaces() {
-	local wan_device wan_ifname
-
 	AW_BPF_WAN_IFACES=""
 
+	# 1. Check user-configured override in aw-bpf
+	local configured_wan
+	config_load "aw-bpf"
+	config_get configured_wan "common" wan_dev ""
+	if [ -n "$configured_wan" ] && [ -e "/sys/class/net/$configured_wan" ]; then
+		AW_BPF_WAN_IFACES="$configured_wan"
+		return 0
+	fi
+
+	# 2. Query dynamic netifd device via network.sh
+	local net_dev
+	if [ -f /lib/functions/network.sh ]; then
+		. /lib/functions/network.sh
+		network_get_device net_dev "wan" || network_get_physdev net_dev "wan"
+		if [ -n "$net_dev" ] && [ -e "/sys/class/net/$net_dev" ]; then
+			AW_BPF_WAN_IFACES="$net_dev"
+			return 0
+		fi
+	fi
+
+	# 3. Fallback to static UCI network.wan definition
 	config_load network
+	local wan_device wan_ifname
 	config_get wan_device wan device
 	config_get wan_ifname wan ifname
 
@@ -58,6 +104,14 @@ resolve_wan_ifaces() {
 	for iface in $wan_ifname; do
 		if [ -n "$iface" ] && [ -e "/sys/class/net/$iface" ]; then
 			AW_BPF_WAN_IFACES="$iface"
+			return 0
+		fi
+	done
+
+	# 4. Probe common WAN device names that physically exist
+	for candidate in wan eth1 eth0; do
+		if [ -e "/sys/class/net/$candidate" ]; then
+			AW_BPF_WAN_IFACES="$candidate"
 			return 0
 		fi
 	done
@@ -178,8 +232,16 @@ sync_fastpath() {
 		resolve_wan_ifaces
 		local lan_dev=$(echo $AW_BPF_LAN_IFACES | awk '{print $1}')
 		local wan_dev=$(echo $AW_BPF_WAN_IFACES | awk '{print $1}')
-		[ -z "$lan_dev" ] && lan_dev="br-lan"
-		[ -z "$wan_dev" ] && wan_dev="eth1"
+
+		if [ -z "$lan_dev" ] || [ ! -e "/sys/class/net/$lan_dev" ]; then
+			echo "Warning: no valid LAN interface found for FastPath" >&2
+			return 1
+		fi
+		if [ -z "$wan_dev" ] || [ ! -e "/sys/class/net/$wan_dev" ]; then
+			echo "Warning: no valid WAN interface found for FastPath" >&2
+			return 1
+		fi
+
 		echo "Syncing FastPath for $lan_dev and $wan_dev..." >&2
 		local retry=0
 		while [ $retry -lt 5 ]; do
@@ -201,8 +263,8 @@ sync_router_ips() {
 	resolve_wan_ifaces
 	local lan_dev=$(echo $AW_BPF_LAN_IFACES | awk '{print $1}')
 	local wan_dev=$(echo $AW_BPF_WAN_IFACES | awk '{print $1}')
-	[ -z "$lan_dev" ] && lan_dev="br-lan"
-	[ -z "$wan_dev" ] && wan_dev="eth1"
+	[ -z "$lan_dev" ] || [ ! -e "/sys/class/net/$lan_dev" ] && return 0
+	[ -z "$wan_dev" ] || [ ! -e "/sys/class/net/$wan_dev" ] && return 0
 	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
 	if [ -x "$ctl" ]; then
 		echo "Syncing router IP addresses for $lan_dev and $wan_dev..." >&2
