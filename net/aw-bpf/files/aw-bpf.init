@@ -143,16 +143,36 @@ load_bpf_resources() {
 	done
 
 	sync_router_ips
+	sync_xdpi || true
 	load_dns_bpf_program || true
 	sync_fastpath || true
 
 	return 0
 }
 
+sync_xdpi() {
+	local enable_xdpi
+	config_load "aw-bpf"
+	config_get enable_xdpi "common" enable_xdpi "1"
+	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
+	if [ -x "$ctl" ]; then
+		if [ "$enable_xdpi" = "1" ]; then
+			echo "Enabling xDPI..." >&2
+			"$ctl" xdpi on >/dev/null 2>&1 || true
+		else
+			echo "Disabling xDPI..." >&2
+			"$ctl" xdpi off >/dev/null 2>&1 || true
+		fi
+	fi
+}
+
 sync_fastpath() {
 	local enable_fastpath
 	config_load "aw-bpf"
-	config_get enable_fastpath "common" enable_fastpath "0"
+	config_get enable_fastpath "common" enable_fastpath "1"
+	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
+	[ ! -x "$ctl" ] && return 0
+
 	if [ "$enable_fastpath" = "1" ]; then
 		resolve_lan_ifaces
 		resolve_wan_ifaces
@@ -160,19 +180,19 @@ sync_fastpath() {
 		local wan_dev=$(echo $AW_BPF_WAN_IFACES | awk '{print $1}')
 		[ -z "$lan_dev" ] && lan_dev="br-lan"
 		[ -z "$wan_dev" ] && wan_dev="eth1"
-		local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
-		if [ -x "$ctl" ]; then
-			echo "Syncing FastPath for $lan_dev and $wan_dev..." >&2
-			local retry=0
-			while [ $retry -lt 5 ]; do
-				if "$ctl" fastpath enable "$lan_dev" "$wan_dev"; then
-					return 0
-				fi
-				retry=$((retry + 1))
-				sleep 1
-			done
-			echo "Warning: failed to enable FastPath after retries" >&2
-		fi
+		echo "Syncing FastPath for $lan_dev and $wan_dev..." >&2
+		local retry=0
+		while [ $retry -lt 5 ]; do
+			if "$ctl" fastpath enable "$lan_dev" "$wan_dev"; then
+				return 0
+			fi
+			retry=$((retry + 1))
+			sleep 1
+		done
+		echo "Warning: failed to enable FastPath after retries" >&2
+	else
+		echo "Disabling FastPath..." >&2
+		"$ctl" fastpath disable >/dev/null 2>&1 || true
 	fi
 }
 
@@ -319,6 +339,12 @@ cleanup_bpf_resources() {
 		rm -f /var/run/aw-bpf.dns_xdp.md5 2>/dev/null
 	fi
 
+	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
+	if [ -x "$ctl" ]; then
+		"$ctl" fastpath disable >/dev/null 2>&1 || true
+		"$ctl" xdpi off >/dev/null 2>&1 || true
+	fi
+
 	cleanup_aw_bpf_pins
 
 	return 0
@@ -463,6 +489,7 @@ reload_network() {
 	done
 
 	sync_router_ips
+	sync_xdpi || true
 	load_dns_bpf_program || true
 	sync_fastpath || true
 }
