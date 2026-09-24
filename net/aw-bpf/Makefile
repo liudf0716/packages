@@ -9,11 +9,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
 PKG_VERSION:=2.9.58
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=8fb301e8ae594d35a3c2c59188449e5b59494a0f13d306823c85a309b1b7eca7
+PKG_HASH:=7a8470fb8e513c833097b0c24570654ab59b2f2aafe1a941e8334c6911e304cf
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
@@ -62,8 +62,8 @@ endef
 define Build/Compile
 
 	$(call Build/Compile/Default)
-	$(call CompileBPF,$(PKG_BUILD_DIR)/aw_bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
-	$(call CompileBPF,$(PKG_BUILD_DIR)/dns_bpf.c,$(if $(filter arm aarch64 x86_64 i386,$(ARCH)),-DENABLE_XDPI_FEATURE))
+	$(call CompileBPF,$(PKG_BUILD_DIR)/aw_bpf.c)
+	$(call CompileBPF,$(PKG_BUILD_DIR)/dns_bpf.c)
 	$(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
 endef
 
