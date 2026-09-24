@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
-PKG_VERSION:=2.9.53
-PKG_RELEASE:=2
+PKG_VERSION:=2.9.58
+PKG_RELEASE:=1
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=94ab8cbf444b28c581b5725beb4cc3e0c3e4ed28ed8c38ae500bcf3655eb7ce9
+PKG_HASH:=dd280316fefbec88a2e0644f3c051fe6b011d83e9403a096f8fe06317a43b50a
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
