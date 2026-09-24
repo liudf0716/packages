@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
-PKG_VERSION:=2.9.53
+PKG_VERSION:=2.9.58
 PKG_RELEASE:=1
 
 PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
