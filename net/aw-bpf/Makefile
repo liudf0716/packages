@@ -84,6 +84,8 @@ define Package/aw-bpf/install
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/dns_bpf.o $(1)/lib/bpf/dns-bpf.o
 	$(INSTALL_DIR) $(1)/etc/hotplug.d/iface
 	$(INSTALL_BIN) ./files/85-aw-bpf $(1)/etc/hotplug.d/iface/85-aw-bpf
+	$(INSTALL_DIR) $(1)/usr/libexec/aw-bpf
+	$(INSTALL_BIN) ./files/aw-ppe-offload.sh $(1)/usr/libexec/aw-bpf/aw-ppe-offload.sh
 endef
 
 define Package/aw-bpf/postinst

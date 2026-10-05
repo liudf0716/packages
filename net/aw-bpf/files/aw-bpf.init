@@ -11,7 +11,7 @@ CONF_FILE="/var/etc/eventd.conf"
 BPF_FS_ROOT="/sys/fs/bpf"
 AW_BPF_PIN_DIR="$BPF_FS_ROOT/tc/globals"
 AW_BPF_LEGACY_PIN_DIR="$BPF_FS_ROOT/xdp/globals"
-AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_portal_buf dns_ringbuf_portal dns_stats_map captive_domain_map xdpi_config_map fastpath_config_map fastpath_flow_map fastpath_ip_mac_map fastpath_out_tracker_map router_ip_map ipv4_qos_map ipv6_qos_map mac_qos_map xdpi_l7_qos_map captive_reinject_map"
+AW_BPF_MAPS="ipv4_map ipv6_map mac_map tcp_conn_map udp_conn_map xdpi_l7_map session_events_map prog_array_map dns_ringbuf dns_portal_buf dns_ringbuf_portal dns_stats_map captive_domain_map xdpi_config_map fastpath_config_map ppe_config_map fastpath_flow_map fastpath_ip_mac_map fastpath_out_tracker_map router_ip_map ipv4_qos_map ipv6_qos_map mac_qos_map xdpi_l7_qos_map captive_reinject_map"
 EXTRA_COMMANDS="reload_network"
 EXTRA_HELP="	reload_network	Re-attach TC hooks, sync router IPs, and sync fastpath"
 
@@ -200,8 +200,56 @@ load_bpf_resources() {
 	sync_xdpi || true
 	load_dns_bpf_program || true
 	sync_fastpath || true
+	sync_ppe_selective_offload || true
+	sync_host_qos || true
 
 	return 0
+}
+
+sync_ppe_selective_offload() {
+	local script="/usr/libexec/aw-bpf/aw-ppe-offload.sh"
+
+	[ -x "$script" ] || script="/usr/share/aw-bpf/aw-ppe-offload.sh"
+	if [ -x "$script" ]; then
+		echo "Applying selective PPE offload (policy IPs skip hardware flowtable)..." >&2
+		"$script" || true
+	fi
+}
+
+sync_host_qos() {
+	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
+	[ ! -x "$ctl" ] && return 0
+
+	config_load "aw-bpf"
+	apply_host_rule() {
+		local section="$1"
+		local type target downrate uprate time_enable weekdays timestart timestop
+		config_get type "$section" type "ipv4"
+		config_get target "$section" target ""
+		config_get downrate "$section" downrate "0"
+		config_get uprate "$section" uprate "0"
+		config_get time_enable "$section" time_enable "0"
+		config_get weekdays "$section" weekdays ""
+		config_get timestart "$section" timestart ""
+		config_get timestop "$section" timestop ""
+
+		[ -z "$target" ] && return 0
+		[ "$downrate" = "0" ] && [ "$uprate" = "0" ] && return 0
+
+		# Ensure key exists in map first
+		"$ctl" "$type" add "$target" >/dev/null 2>&1 || true
+
+		local args="$type update $target downrate $downrate uprate $uprate"
+		if [ "$time_enable" = "1" ]; then
+			[ -n "$weekdays" ] && args="$args --weekdays $weekdays"
+			[ -n "$timestart" ] && [ -n "$timestop" ] && args="$args --timestart $timestart --timestop $timestop"
+		else
+			args="$args --notime"
+		fi
+
+		$ctl $args >/dev/null 2>&1 || true
+	}
+	config_foreach apply_host_rule "host"
 }
 
 sync_xdpi() {
@@ -445,6 +493,9 @@ generate_conf() {
 	config_get enable_qos "common" enable_qos "0"
 	config_get qos_down "common" qos_down "0"
 	config_get qos_up "common" qos_up "0"
+	local enable_ppe_poller ppe_poller_interval_ms
+	config_get enable_ppe_poller "common" enable_ppe_poller "1"
+	config_get ppe_poller_interval_ms "common" ppe_poller_interval_ms "1000"
 	config_get location_id "common" location_id ""
 	config_get ap_device_id "common" ap_device_id ""
 	config_get ap_mac_address "common" ap_mac_address ""
@@ -487,6 +538,8 @@ generate_conf() {
 	[ -z "$enable_qos" ] && enable_qos="0"
 	[ -z "$qos_down" ] && qos_down="0"
 	[ -z "$qos_up" ] && qos_up="0"
+	[ -z "$enable_ppe_poller" ] && enable_ppe_poller="1"
+	[ -z "$ppe_poller_interval_ms" ] && ppe_poller_interval_ms="1000"
 	[ -z "$location_id" ] && location_id="UNKNOWN"
 	[ -z "$ap_device_id" ] && ap_device_id="UNKNOWN"
 	[ -z "$ap_mac_address" ] && ap_mac_address="UNKNOWN"
@@ -500,6 +553,8 @@ enable_event_log=${enable_event_log}
 enable_qos=${enable_qos}
 qos_down=${qos_down}
 qos_up=${qos_up}
+enable_ppe_poller=${enable_ppe_poller}
+ppe_poller_interval_ms=${ppe_poller_interval_ms}
 location_id=${location_id}
 ap_device_id=${ap_device_id}
 ap_mac_address=${ap_mac_address}
@@ -524,6 +579,7 @@ start_service() {
 	procd_set_param command "$PROG" -c "$CONF_FILE"
 	procd_set_param respawn 3600 5 0
 	procd_set_param file "$CONF_FILE"
+	procd_set_param reload_signal SIGHUP
 	procd_close_instance
 }
 
@@ -554,23 +610,37 @@ reload_network() {
 	sync_xdpi || true
 	load_dns_bpf_program || true
 	sync_fastpath || true
+	sync_ppe_selective_offload || true
+	sync_host_qos || true
 }
 
 reload_service() {
 	echo "Reloading aw-bpf service..." >&2
 	generate_conf
 	reload_network
+	procd_send_signal "$NAME" '*' SIGHUP 2>/dev/null || kill -HUP "$(pidof aw-eventd)" 2>/dev/null || true
 }
 
 stop_service() {
 	echo "Stopping aw-bpf service..." >&2
+	cleanup_ppe_nft || true
 	cleanup_bpf_resources
 	unload_xdpi
 	echo "aw-bpf cleanup completed" >&2
 }
 
+cleanup_ppe_nft() {
+	local script="/usr/libexec/aw-bpf/aw-ppe-offload.sh"
+
+	[ -x "$script" ] || script="/usr/share/aw-bpf/aw-ppe-offload.sh"
+	if [ -x "$script" ]; then
+		"$script" cleanup || true
+	fi
+}
+
 service_triggers() {
 	procd_add_reload_trigger "aw-bpf"
 	procd_add_reload_trigger "network"
+	procd_add_reload_trigger "firewall"
 	procd_add_interface_trigger "lan" "wan"
 }
