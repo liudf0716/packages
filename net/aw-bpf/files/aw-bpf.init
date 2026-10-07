@@ -301,8 +301,12 @@ sync_fastpath() {
 		done
 		echo "Warning: failed to enable FastPath after retries" >&2
 	else
+		resolve_lan_ifaces
+		resolve_wan_ifaces
+		local lan_dev=$(echo $AW_BPF_LAN_IFACES | awk '{print $1}')
+		local wan_dev=$(echo $AW_BPF_WAN_IFACES | awk '{print $1}')
 		echo "Disabling FastPath..." >&2
-		"$ctl" fastpath disable >/dev/null 2>&1 || true
+		"$ctl" fastpath disable "$lan_dev" "$wan_dev" >/dev/null 2>&1 || true
 	fi
 }
 
