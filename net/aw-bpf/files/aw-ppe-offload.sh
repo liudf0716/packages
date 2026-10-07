@@ -42,9 +42,9 @@ patch_flow_add() {
 	echo "$chain" | grep -qE 'flow (add|offload)' || return 0
 
 	v4_ok=0
-	echo "$chain" | grep -q 'aw_policy_ipv4' && v4_ok=1
+	echo "$chain" | grep -q 'aw_policy_ipv4' && echo "$chain" | grep -q 'ct packets' && v4_ok=1
 	v6_ok=0
-	echo "$chain" | grep -q 'aw_policy_ipv6' && v6_ok=1
+	echo "$chain" | grep -q 'aw_policy_ipv6' && echo "$chain" | grep -q 'ct packets' && v6_ok=1
 	[ "$v4_ok" = "1" ] && [ "$v6_ok" = "1" ] && return 0
 
 	ftname=$(echo "$chain" | grep -E 'flow (add|offload) @' | sed -n 's/.*flow \(add\|offload\) @\([^ ]*\).*/\2/p' | head -n 1)
@@ -57,6 +57,7 @@ patch_flow_add() {
 		if [ -n "$handle" ]; then
 			if nft replace rule inet fw4 forward handle "$handle" \
 				meta l4proto '{ tcp, udp }' \
+				ct packets \> 6 \
 				ip saddr != @aw_policy_ipv4 \
 				ip daddr != @aw_policy_ipv4 \
 				flow add @"$ftname"; then
@@ -74,6 +75,7 @@ patch_flow_add() {
 			if [ -n "$handle" ]; then
 				nft replace rule inet fw4 forward handle "$handle" \
 					meta l4proto '{ tcp, udp }' \
+					ct packets \> 6 \
 					ip saddr != @aw_policy_ipv4 \
 					ip daddr != @aw_policy_ipv4 \
 					flow add @"$ftname" || LOG "nft replace existing IPv4 flow add failed"
@@ -89,6 +91,7 @@ patch_flow_add() {
 			if [ -n "$handle" ]; then
 				nft replace rule inet fw4 forward handle "$handle" \
 					meta l4proto '{ tcp, udp }' \
+					ct packets \> 6 \
 					ip6 saddr != @aw_policy_ipv6 \
 					ip6 daddr != @aw_policy_ipv6 \
 					flow add @"$ftname" || LOG "nft replace IPv6 flow add failed"
@@ -100,6 +103,7 @@ patch_flow_add() {
 	if [ "$v6_ok" != "1" ]; then
 		nft add rule inet fw4 forward \
 			meta l4proto '{ tcp, udp }' \
+			ct packets \> 6 \
 			ip6 saddr != @aw_policy_ipv6 \
 			ip6 daddr != @aw_policy_ipv6 \
 			flow add @"$ftname" || LOG "nft add IPv6 flow add failed"
