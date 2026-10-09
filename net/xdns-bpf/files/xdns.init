@@ -36,23 +36,15 @@ start_service() {
 	# Ensure clsact qdisc exists
 	tc qdisc add dev "$ifname" clsact 2>/dev/null || true
 
-	# Ensure aw-bpf is chained to pref 2 if present
-	if [ -f "/lib/bpf/aw-bpf.o" ]; then
-		if tc filter show dev "$ifname" ingress pref 1 2>/dev/null | grep -q "aw-bpf"; then
-			tc filter del dev "$ifname" ingress pref 1 2>/dev/null || true
-			tc filter del dev "$ifname" egress pref 1 2>/dev/null || true
-		fi
-		if ! tc filter show dev "$ifname" ingress pref 2 2>/dev/null | grep -q "aw-bpf"; then
-			tc filter add dev "$ifname" ingress pref 2 handle 1 bpf da obj /lib/bpf/aw-bpf.o sec tc/ingress 2>/dev/null || true
-			tc filter add dev "$ifname" egress pref 2 handle 1 bpf da obj /lib/bpf/aw-bpf.o sec tc/egress 2>/dev/null || true
-			echo "Chained aw-bpf to pref 2"
-		fi
-	fi
+	# chawrt-bpf-dispatcher pipeline standard:
+	# Ingress: xdns-bpf sits at pref 20 (Stage: Proxy rewrite after aw-bpf audit)
+	# Egress:  xdns-bpf sits at pref 10 (Stage: Reverse restore before aw-bpf audit)
+	tc filter replace dev "$ifname" ingress pref 20 handle 20 bpf da obj "$BPF_OBJ" sec tc/ingress
+	tc filter replace dev "$ifname" egress pref 10 handle 10 bpf da obj "$BPF_OBJ" sec tc/egress
 
-	# Attach xdns_bpf at pref 1
-	# Non-proxied traffic returns TC_ACT_UNSPEC and cleanly falls through to pref 2 (aw-bpf)
-	tc filter replace dev "$ifname" ingress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec tc/ingress
-	tc filter replace dev "$ifname" egress pref 1 handle 10 bpf da obj "$BPF_OBJ" sec tc/egress
+	# Clean up any legacy pref 1 / handle 10 filters
+	tc filter del dev "$ifname" ingress pref 1 handle 10 2>/dev/null || true
+	tc filter del dev "$ifname" egress pref 1 handle 10 2>/dev/null || true
 
 	# Initialize runtime config map
 	$CTL set-config "$xkcp_dns" "$xkcp_tcp" 1
@@ -62,22 +54,12 @@ start_service() {
 		$CTL load-domains "$proxy_domains_file"
 	fi
 
-	echo "xdns-bpf started on $ifname"
+	echo "xdns-bpf started on $ifname (pipeline ingress pref 20, egress pref 10)"
 }
 
 stop_service() {
 	load_config
-	tc filter del dev "$ifname" ingress pref 1 2>/dev/null || true
-	tc filter del dev "$ifname" egress pref 1 2>/dev/null || true
-
-	# Move aw-bpf back to pref 1 if present at pref 2
-	if tc filter show dev "$ifname" ingress pref 2 2>/dev/null | grep -q "aw-bpf"; then
-		tc filter del dev "$ifname" ingress pref 2 2>/dev/null || true
-		tc filter del dev "$ifname" egress pref 2 2>/dev/null || true
-		tc filter add dev "$ifname" ingress pref 1 handle 1 bpf da obj /lib/bpf/aw-bpf.o sec tc/ingress 2>/dev/null || true
-		tc filter add dev "$ifname" egress pref 1 handle 1 bpf da obj /lib/bpf/aw-bpf.o sec tc/egress 2>/dev/null || true
-		echo "Restored aw-bpf to pref 1"
-	fi
-
+	tc filter del dev "$ifname" ingress pref 20 handle 20 2>/dev/null || true
+	tc filter del dev "$ifname" egress pref 10 handle 10 2>/dev/null || true
 	echo "xdns-bpf stopped on $ifname"
 }

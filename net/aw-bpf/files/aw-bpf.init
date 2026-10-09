@@ -123,9 +123,9 @@ detach_tc_programs() {
 	[ -z "$iface" ] && return 0
 	[ ! -e "/sys/class/net/$iface" ] && return 0
 
-	tc filter del dev "$iface" ingress 2>/dev/null || true
-	tc filter del dev "$iface" egress 2>/dev/null || true
-	tc qdisc del dev "$iface" clsact 2>/dev/null || true
+	# Delete only aw-bpf specific filters without disrupting clsact or other pipeline stages
+	tc filter del dev "$iface" ingress pref 10 handle 10 2>/dev/null || tc filter del dev "$iface" ingress pref 1 2>/dev/null || true
+	tc filter del dev "$iface" egress pref 20 handle 20 2>/dev/null || tc filter del dev "$iface" egress pref 2 2>/dev/null || true
 }
 
 attach_tc_programs() {
@@ -139,26 +139,33 @@ attach_tc_programs() {
 		return 1
 	}
 
-	tc qdisc del dev "$iface" clsact 2>/dev/null || true
+	# Ensure clsact qdisc exists without deleting existing qdisc
 	tc qdisc add dev "$iface" clsact 2>/dev/null || true
 
-	if ! tc filter add dev "$iface" ingress prio 1 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/tmp/aw-bpf.ingress.err; then
+	# chawrt-bpf-dispatcher pipeline standard:
+	# Ingress: aw-bpf sits at prio 10 (Stage: Audit/DPI before proxy rewrite)
+	# Egress:  aw-bpf sits at prio 20 (Stage: Audit/QoS after reverse proxy restore)
+	if ! tc filter replace dev "$iface" ingress pref 10 handle 10 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/tmp/aw-bpf.ingress.err; then
 		echo "Failed to attach aw-bpf ingress to $iface: $(cat /tmp/aw-bpf.ingress.err 2>/dev/null)" >&2
 		rm -f /tmp/aw-bpf.ingress.err
 		return 1
 	fi
 	rm -f /tmp/aw-bpf.ingress.err
 
-	if ! tc filter add dev "$iface" egress prio 1 bpf da obj "$aw_bpf_file" sec tc/egress 2>/tmp/aw-bpf.egress.err; then
+	if ! tc filter replace dev "$iface" egress pref 20 handle 20 bpf da obj "$aw_bpf_file" sec tc/egress 2>/tmp/aw-bpf.egress.err; then
 		echo "Failed to attach aw-bpf egress to $iface: $(cat /tmp/aw-bpf.egress.err 2>/dev/null)" >&2
 		rm -f /tmp/aw-bpf.egress.err
-		tc filter del dev "$iface" ingress 2>/dev/null || true
-		tc qdisc del dev "$iface" clsact 2>/dev/null || true
 		return 1
 	fi
 	rm -f /tmp/aw-bpf.egress.err
 
-	echo "aw-bpf attached on $iface" >&2
+	# Clean up any legacy pref 1 / pref 2 stale filters
+	tc filter del dev "$iface" ingress pref 1 handle 1 2>/dev/null || true
+	tc filter del dev "$iface" egress pref 1 handle 1 2>/dev/null || true
+	tc filter del dev "$iface" ingress pref 2 handle 1 2>/dev/null || true
+	tc filter del dev "$iface" egress pref 2 handle 1 2>/dev/null || true
+
+	echo "aw-bpf attached on $iface (pipeline ingress pref 10, egress pref 20)" >&2
 	return 0
 }
 
