@@ -123,14 +123,9 @@ detach_tc_programs() {
 	[ -z "$iface" ] && return 0
 	[ ! -e "/sys/class/net/$iface" ] && return 0
 
-	if [ -x "/usr/bin/chawrt-bpf-dispatcher" ]; then
-		/usr/bin/chawrt-bpf-dispatcher unregister ingress audit 2>/dev/null || true
-		/usr/bin/chawrt-bpf-dispatcher unregister egress audit 2>/dev/null || true
-	fi
-
 	# Delete only aw-bpf specific filters without disrupting clsact or other pipeline stages
-	tc filter del dev "$iface" ingress pref 10 handle 10 2>/dev/null || tc filter del dev "$iface" ingress pref 1 2>/dev/null || true
-	tc filter del dev "$iface" egress pref 20 handle 20 2>/dev/null || tc filter del dev "$iface" egress pref 2 2>/dev/null || true
+	tc filter del dev "$iface" ingress pref 10 handle 10 2>/dev/null || true
+	tc filter del dev "$iface" egress pref 20 handle 20 2>/dev/null || true
 }
 
 attach_tc_programs() {
@@ -147,9 +142,9 @@ attach_tc_programs() {
 	# Ensure clsact qdisc exists without deleting existing qdisc
 	tc qdisc add dev "$iface" clsact 2>/dev/null || true
 
-	# chawrt-bpf-dispatcher pipeline standard:
-	# Ingress: aw-bpf sits at Stage Audit (pref 10 fallback)
-	# Egress:  aw-bpf sits at Stage Audit (pref 20 fallback)
+	# TC native priority cascade standard:
+	# Ingress: aw-bpf sits at pref 10 (audit/portal after proxy at pref 5)
+	# Egress:  aw-bpf sits at pref 20 (audit/portal after proxy at pref 10)
 	if ! tc filter replace dev "$iface" ingress pref 10 handle 10 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/tmp/aw-bpf.ingress.err; then
 		echo "Failed to attach aw-bpf ingress to $iface: $(cat /tmp/aw-bpf.ingress.err 2>/dev/null)" >&2
 		rm -f /tmp/aw-bpf.ingress.err
@@ -164,15 +159,9 @@ attach_tc_programs() {
 	fi
 	rm -f /tmp/aw-bpf.egress.err
 
-	# Register into chawrt-bpf-dispatcher if active
-	if [ -x "/usr/bin/chawrt-bpf-dispatcher" ]; then
-		/usr/bin/chawrt-bpf-dispatcher register ingress audit tc_ingress 2>/dev/null || true
-		/usr/bin/chawrt-bpf-dispatcher register egress audit tc_egress 2>/dev/null || true
-	fi
-
 	# Clean up any legacy pref 1 / pref 2 stale filters
-	tc filter del dev "$iface" ingress pref 1 handle 1 2>/dev/null || true
-	tc filter del dev "$iface" egress pref 1 handle 1 2>/dev/null || true
+	tc filter del dev "$iface" ingress pref 1 2>/dev/null || true
+	tc filter del dev "$iface" egress pref 1 2>/dev/null || true
 	tc filter del dev "$iface" ingress pref 2 handle 1 2>/dev/null || true
 	tc filter del dev "$iface" egress pref 2 handle 1 2>/dev/null || true
 
