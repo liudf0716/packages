@@ -37,14 +37,14 @@ start_service() {
 	tc qdisc add dev "$ifname" clsact 2>/dev/null || true
 
 	# chawrt-bpf-dispatcher pipeline standard:
-	# Ingress: xdns-bpf sits at pref 20 (Stage: Proxy rewrite after aw-bpf audit)
+	# Ingress: xdns-bpf sits at pref 5 (Stage: DNS interception & TCP DNAT before aw-bpf audit)
 	# Egress:  xdns-bpf sits at pref 10 (Stage: Reverse restore before aw-bpf audit)
-	tc filter replace dev "$ifname" ingress pref 20 handle 20 bpf da obj "$BPF_OBJ" sec tc/ingress
+	tc filter replace dev "$ifname" ingress pref 5 handle 5 bpf da obj "$BPF_OBJ" sec tc/ingress
 	tc filter replace dev "$ifname" egress pref 10 handle 10 bpf da obj "$BPF_OBJ" sec tc/egress
 
-	# Clean up any legacy pref 1 / handle 10 filters
-	tc filter del dev "$ifname" ingress pref 1 handle 10 2>/dev/null || true
-	tc filter del dev "$ifname" egress pref 1 handle 10 2>/dev/null || true
+	# Clean up any legacy pref 1 / pref 20 filters
+	tc filter del dev "$ifname" ingress pref 20 2>/dev/null || true
+	tc filter del dev "$ifname" ingress pref 1 2>/dev/null || true
 
 	# Initialize runtime config map
 	$CTL set-config "$xkcp_dns" "$xkcp_tcp" 1
@@ -59,7 +59,7 @@ start_service() {
 
 stop_service() {
 	load_config
-	tc filter del dev "$ifname" ingress pref 20 handle 20 2>/dev/null || true
-	tc filter del dev "$ifname" egress pref 10 handle 10 2>/dev/null || true
+	tc filter del dev "$ifname" ingress pref 5 2>/dev/null || true
+	tc filter del dev "$ifname" egress pref 10 2>/dev/null || true
 	echo "xdns-bpf stopped on $ifname"
 }
