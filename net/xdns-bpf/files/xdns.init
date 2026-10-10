@@ -37,10 +37,16 @@ start_service() {
 	tc qdisc add dev "$ifname" clsact 2>/dev/null || true
 
 	# chawrt-bpf-dispatcher pipeline standard:
-	# Ingress: xdns-bpf sits at pref 5 (Stage: DNS interception & TCP DNAT before aw-bpf audit)
-	# Egress:  xdns-bpf sits at pref 10 (Stage: Reverse restore before aw-bpf audit)
+	# Ingress: xdns-bpf sits at Stage Proxy (pref 5 fallback)
+	# Egress:  xdns-bpf sits at Stage Proxy (pref 10 fallback)
 	tc filter replace dev "$ifname" ingress pref 5 handle 5 bpf da obj "$BPF_OBJ" sec tc/ingress
 	tc filter replace dev "$ifname" egress pref 10 handle 10 bpf da obj "$BPF_OBJ" sec tc/egress
+
+	# Register into chawrt-bpf-dispatcher if active
+	if [ -x "/usr/bin/chawrt-bpf-dispatcher" ]; then
+		/usr/bin/chawrt-bpf-dispatcher register ingress proxy tc_xdns_ingress 2>/dev/null || true
+		/usr/bin/chawrt-bpf-dispatcher register egress proxy tc_xdns_egress 2>/dev/null || true
+	fi
 
 	# Clean up any legacy pref 1 / pref 20 filters
 	tc filter del dev "$ifname" ingress pref 20 2>/dev/null || true
@@ -54,11 +60,15 @@ start_service() {
 		$CTL load-domains "$proxy_domains_file"
 	fi
 
-	echo "xdns-bpf started on $ifname (pipeline ingress pref 20, egress pref 10)"
+	echo "xdns-bpf started on $ifname (pipeline ingress pref 5, egress pref 10)"
 }
 
 stop_service() {
 	load_config
+	if [ -x "/usr/bin/chawrt-bpf-dispatcher" ]; then
+		/usr/bin/chawrt-bpf-dispatcher unregister ingress proxy 2>/dev/null || true
+		/usr/bin/chawrt-bpf-dispatcher unregister egress proxy 2>/dev/null || true
+	fi
 	tc filter del dev "$ifname" ingress pref 5 2>/dev/null || true
 	tc filter del dev "$ifname" egress pref 10 2>/dev/null || true
 	echo "xdns-bpf stopped on $ifname"
