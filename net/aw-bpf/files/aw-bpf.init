@@ -124,6 +124,7 @@ detach_tc_programs() {
 	[ ! -e "/sys/class/net/$iface" ] && return 0
 
 	# Delete only aw-bpf specific filters without disrupting clsact or other pipeline stages
+	tc filter del dev "$iface" egress pref 15 handle 15 2>/dev/null || true
 	tc filter del dev "$iface" ingress pref 10 handle 10 2>/dev/null || true
 	tc filter del dev "$iface" egress pref 20 handle 20 2>/dev/null || true
 }
@@ -131,6 +132,7 @@ detach_tc_programs() {
 attach_tc_programs() {
 	local iface="$1"
 	local aw_bpf_file="/lib/bpf/aw-bpf.o"
+	local dns_bpf_file="/lib/bpf/dns-bpf.o"
 
 	[ -z "$iface" ] && return 0
 	[ ! -e "/sys/class/net/$iface" ] && return 0
@@ -142,9 +144,8 @@ attach_tc_programs() {
 	# Ensure clsact qdisc exists without deleting existing qdisc
 	tc qdisc add dev "$iface" clsact 2>/dev/null || true
 
-	# TC native priority cascade standard:
+	# Pipeline standards:
 	# Ingress: aw-bpf sits at pref 10 (audit/portal after proxy at pref 5)
-	# Egress:  aw-bpf sits at pref 20 (audit/portal after proxy at pref 10)
 	if ! tc filter replace dev "$iface" ingress pref 10 handle 10 bpf da obj "$aw_bpf_file" sec tc/ingress 2>/tmp/aw-bpf.ingress.err; then
 		echo "Failed to attach aw-bpf ingress to $iface: $(cat /tmp/aw-bpf.ingress.err 2>/dev/null)" >&2
 		rm -f /tmp/aw-bpf.ingress.err
@@ -152,6 +153,19 @@ attach_tc_programs() {
 	fi
 	rm -f /tmp/aw-bpf.ingress.err
 
+	# Egress: dns-bpf sits at pref 15 on LAN interfaces (read-only DNS snoop after xdns SNAT pref 10 and before aw-bpf pref 20)
+	if [ -f "$dns_bpf_file" ]; then
+		case " $AW_BPF_LAN_IFACES " in
+			*" $iface "*)
+				if ! tc filter replace dev "$iface" egress pref 15 handle 15 bpf da obj "$dns_bpf_file" sec tc/egress 2>/tmp/dns-bpf.egress.err; then
+					echo "Warning: Failed to attach dns-bpf egress to $iface: $(cat /tmp/dns-bpf.egress.err 2>/dev/null)" >&2
+				fi
+				rm -f /tmp/dns-bpf.egress.err
+				;;
+		esac
+	fi
+
+	# Egress: aw-bpf sits at pref 20 (audit/QoS)
 	if ! tc filter replace dev "$iface" egress pref 20 handle 20 bpf da obj "$aw_bpf_file" sec tc/egress 2>/tmp/aw-bpf.egress.err; then
 		echo "Failed to attach aw-bpf egress to $iface: $(cat /tmp/aw-bpf.egress.err 2>/dev/null)" >&2
 		rm -f /tmp/aw-bpf.egress.err
@@ -165,7 +179,14 @@ attach_tc_programs() {
 	tc filter del dev "$iface" ingress pref 2 handle 1 2>/dev/null || true
 	tc filter del dev "$iface" egress pref 2 handle 1 2>/dev/null || true
 
-	echo "aw-bpf attached on $iface (pipeline ingress pref 10, egress pref 20)" >&2
+	case " $AW_BPF_LAN_IFACES " in
+		*" $iface "*)
+			echo "aw-bpf attached on $iface (pipeline ingress pref 10, dns pref 15, egress pref 20)" >&2
+			;;
+		*)
+			echo "aw-bpf attached on $iface (pipeline ingress pref 10, egress pref 20)" >&2
+			;;
+	esac
 	return 0
 }
 
@@ -359,6 +380,16 @@ load_dns_bpf_program() {
 	local dns_bpf_file="/lib/bpf/dns-bpf.o"
 	local xdp_pin_base="/sys/fs/bpf/aw"
 
+	# Detach legacy XDP program from WAN interfaces if present
+	resolve_wan_ifaces
+	for iface in $AW_BPF_WAN_IFACES; do
+		if ip link show dev "$iface" 2>/dev/null | grep -q "xdp_dns_monitor"; then
+			echo "Detaching legacy DNS XDP program from $iface..." >&2
+			ip link set dev "$iface" xdp off 2>/dev/null || true
+		fi
+	done
+	rm -f /var/run/aw-bpf.dns_xdp.md5 2>/dev/null
+
 	if [ ! -f "$dns_bpf_file" ]; then
 		echo "dns-bpf.o not found at $dns_bpf_file" >&2
 		return 0
@@ -366,71 +397,20 @@ load_dns_bpf_program() {
 
 	mkdir -p "$xdp_pin_base" 2>/dev/null || true
 
-	resolve_wan_ifaces
-	if [ -z "$AW_BPF_WAN_IFACES" ]; then
-		echo "No valid WAN interfaces found. Skip loading DNS XDP." >&2
-		return 1
+	# Pin maps for userspace consumers (aw-eventd and wifidogx)
+	[ ! -e "$xdp_pin_base/dns_ringbuf" ] && bpftool map pin name dns_ringbuf "$xdp_pin_base/dns_ringbuf" 2>/dev/null
+	if [ ! -e "$xdp_pin_base/dns_ringbuf_portal" ]; then
+		bpftool map pin name dns_portal_buf "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
+		bpftool map pin name dns_ringbuf_por "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
+		bpftool map pin name dns_ringbuf_portal "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null
 	fi
-
-	local current_hash=""
-	[ -f "$dns_bpf_file" ] && current_hash=$(md5sum "$dns_bpf_file" 2>/dev/null | awk '{print $1}')
-	local attached_hash=""
-	[ -f "/var/run/aw-bpf.dns_xdp.md5" ] && attached_hash=$(cat /var/run/aw-bpf.dns_xdp.md5 2>/dev/null)
-
-	for iface in $AW_BPF_WAN_IFACES; do
-		local need_attach=1
-		if ip link show dev "$iface" 2>/dev/null | grep -q "xdp_dns_monitor"; then
-			if [ -n "$current_hash" ] && [ "$current_hash" = "$attached_hash" ]; then
-				if [ -e "$xdp_pin_base/dns_ringbuf" ] && \
-				   { [ -e "$xdp_pin_base/dns_ringbuf_portal" ] || [ -e "$xdp_pin_base/dns_portal_buf" ]; }; then
-					echo "DNS XDP program already attached to $iface and up-to-date, skipping." >&2
-					need_attach=0
-				else
-					echo "DNS XDP program attached to $iface but map pins missing, re-attaching..." >&2
-				fi
-			else
-				echo "DNS XDP program on $iface is outdated or upgraded, updating..." >&2
-			fi
-		fi
-
-		if [ "$need_attach" = "1" ]; then
-			echo "Attaching DNS XDP program to $iface..." >&2
-			if ! ip link set dev "$iface" xdp obj "$dns_bpf_file" sec xdp 2>/tmp/aw-bpf.xdp.err; then
-				# Fallback: if in-place replace is unsupported by driver, detach then attach
-				ip link set dev "$iface" xdp off 2>/dev/null || true
-				if ! ip link set dev "$iface" xdp obj "$dns_bpf_file" sec xdp 2>/tmp/aw-bpf.xdp.err; then
-					echo "Failed to attach dns xdp to $iface: $(cat /tmp/aw-bpf.xdp.err 2>/dev/null)" >&2
-					rm -f /tmp/aw-bpf.xdp.err
-					return 1
-				fi
-			fi
-			rm -f /tmp/aw-bpf.xdp.err
-		fi
-	done
-
-	[ -n "$current_hash" ] && echo "$current_hash" > /var/run/aw-bpf.dns_xdp.md5
-
-	sleep 1
-
-	local xdp_prog_id=$(bpftool prog show name xdp_dns_monitor 2>/dev/null | head -n1 | cut -d':' -f1)
-		[ ! -e "$xdp_pin_base/dns_ringbuf" ] && bpftool map pin name dns_ringbuf "$xdp_pin_base/dns_ringbuf" 2>/dev/null
-		if [ ! -e "$xdp_pin_base/dns_ringbuf_portal" ]; then
-			bpftool map pin name dns_portal_buf "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
-			bpftool map pin name dns_ringbuf_por "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null || \
-			bpftool map pin name dns_ringbuf_portal "$xdp_pin_base/dns_ringbuf_portal" 2>/dev/null
-		fi
-		[ ! -e "$xdp_pin_base/dns_portal_buf" ] && bpftool map pin name dns_portal_buf "$xdp_pin_base/dns_portal_buf" 2>/dev/null || true
-		[ ! -e "$xdp_pin_base/dns_stats_map" ] && bpftool map pin name dns_stats_map "$xdp_pin_base/dns_stats_map" 2>/dev/null
-		if [ -e "$AW_BPF_PIN_DIR/dns_portal_buf" ] && [ ! -e "$AW_BPF_PIN_DIR/dns_ringbuf_portal" ]; then
-			ln -sf "$AW_BPF_PIN_DIR/dns_portal_buf" "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
-		fi
-		if [ ! -e "$AW_BPF_PIN_DIR/dns_ringbuf_portal" ]; then
-			bpftool map pin name dns_portal_buf "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
-		fi
-
-	if [ ! -e "$xdp_pin_base/dns_ringbuf" ]; then
-		echo "Warning: failed to ensure dns_ringbuf pin under $xdp_pin_base" >&2
-		return 1
+	[ ! -e "$xdp_pin_base/dns_portal_buf" ] && bpftool map pin name dns_portal_buf "$xdp_pin_base/dns_portal_buf" 2>/dev/null || true
+	[ ! -e "$xdp_pin_base/dns_stats_map" ] && bpftool map pin name dns_stats_map "$xdp_pin_base/dns_stats_map" 2>/dev/null
+	if [ -e "$AW_BPF_PIN_DIR/dns_portal_buf" ] && [ ! -e "$AW_BPF_PIN_DIR/dns_ringbuf_portal" ]; then
+		ln -sf "$AW_BPF_PIN_DIR/dns_portal_buf" "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
+	fi
+	if [ ! -e "$AW_BPF_PIN_DIR/dns_ringbuf_portal" ]; then
+		bpftool map pin name dns_portal_buf "$AW_BPF_PIN_DIR/dns_ringbuf_portal" 2>/dev/null || true
 	fi
 
 	return 0
@@ -445,20 +425,15 @@ cleanup_bpf_resources() {
 	done
 	
 	resolve_wan_ifaces
-	local xdp_active=0
 	for iface in $AW_BPF_WAN_IFACES; do
 		detach_tc_programs "$iface"
-		# Do not detach XDP on routine stop to avoid resetting PHY and flapping WAN link
 		if ip link show dev "$iface" 2>/dev/null | grep -q "xdp_dns_monitor"; then
-			xdp_active=1
+			ip link set dev "$iface" xdp off 2>/dev/null || true
 		fi
 	done
 
-	# Only remove DNS XDP map pins if XDP is not active
-	if [ "$xdp_active" = "0" ]; then
-		rm -rf /sys/fs/bpf/aw/dns_* 2>/dev/null
-		rm -f /var/run/aw-bpf.dns_xdp.md5 2>/dev/null
-	fi
+	rm -rf /sys/fs/bpf/aw/dns_* 2>/dev/null
+	rm -f /var/run/aw-bpf.dns_xdp.md5 2>/dev/null
 
 	local ctl=$(command -v aw-bpfctl 2>/dev/null || which aw-bpfctl 2>/dev/null || echo "/usr/bin/aw-bpfctl")
 	if [ -x "$ctl" ]; then
