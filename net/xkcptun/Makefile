@@ -12,9 +12,8 @@ PKG_VERSION:=1.09.561
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
+PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/xkcptun/tar.gz/$(PKG_VERSION)?
 PKG_HASH:=20008efdb1c1791f42fdd51e0f6b449440912dd1f1382fe88e17227c9e2fef79
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -42,6 +41,9 @@ define Package/xkcptun/conffiles
 /etc/config/xkcptun
 endef
 
+CMAKE_OPTIONS += \
+	-DAUTO_INSTALL_DEPS=OFF
+
 define Package/xkcptun/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/xkcp_client $(1)/usr/bin/xkcp_client
@@ -54,8 +56,5 @@ define Package/xkcptun/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/xkcptun.init $(1)/etc/init.d/xkcptun
 endef
-
-CMAKE_OPTIONS += \
-	-DAUTO_INSTALL_DEPS=OFF
 
 $(eval $(call BuildPackage,xkcptun))
