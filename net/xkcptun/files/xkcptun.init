@@ -56,6 +56,16 @@ append_toml_tunnel() {
 	[ "${enabled:-1}" -eq 1 ] || return 1
 	[ -n "$local_port" ] || return 1
 
+	if [ "$proto" = "udp" ]; then
+		proxy_type="forward"
+	elif [ -z "$proxy_type" ]; then
+		if [ -n "$target_port" ]; then
+			proxy_type="forward"
+		else
+			proxy_type="redir"
+		fi
+	fi
+
 	cat << EOF >> "$outfile"
 
 [[tunnel]]
