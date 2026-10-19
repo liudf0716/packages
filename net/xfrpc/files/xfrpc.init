@@ -154,6 +154,50 @@ handle_tcp() {
 	toml_kv_int "endTime" "$end_time" "$config"
 }
 
+handle_udp() {
+	local section="$1"
+	local config="$2"
+
+	uci_validate_section xfrpc udp $section \
+		'enabled:bool:1' \
+		'local_ip:host' \
+		'local_port:uinteger' \
+		'remote_port:uinteger' \
+		'use_encryption:bool:0' \
+		'use_compression:bool:0' \
+		'health_check_type:string' \
+		'health_check_url:string' \
+		'health_check_interval:uinteger' \
+		'health_check_timeout:uinteger' \
+		'health_check_max_failed:uinteger' \
+		'start_time:string' \
+		'end_time:string'
+
+	[ $enabled = 0 ] && return
+
+	echo "[[proxies]]" >> "$config"
+	echo "name = \"$section\"" >> "$config"
+	echo "type = \"udp\"" >> "$config"
+	toml_kv "localIP" "$local_ip" "$config"
+	toml_kv_int "localPort" "$local_port" "$config"
+	toml_kv_int "remotePort" "$remote_port" "$config"
+	[ "$use_encryption" = "1" ] && echo "transport.useEncryption = true" >> "$config"
+	[ "$use_compression" = "1" ] && echo "transport.useCompression = true" >> "$config"
+
+	# Health check
+	[ -n "$health_check_type" ] && {
+		echo "healthCheck.type = \"$health_check_type\"" >> "$config"
+		toml_kv "healthCheck.path" "$health_check_url" "$config"
+		toml_kv_int "healthCheck.intervalSeconds" "$health_check_interval" "$config"
+		toml_kv_int "healthCheck.timeoutSeconds" "$health_check_timeout" "$config"
+		toml_kv_int "healthCheck.maxFailed" "$health_check_max_failed" "$config"
+	}
+
+	# Time-based proxy management (xfrpc unique)
+	toml_kv_int "startTime" "$start_time" "$config"
+	toml_kv_int "endTime" "$end_time" "$config"
+}
+
 handle_http() {
 	local section="$1"
 	local config="$2"
@@ -561,6 +605,7 @@ start_service() {
 
 	config_foreach handle_xfrpc xfrpc "$conf_file"
 	config_foreach handle_tcp tcp "$conf_file"
+	config_foreach handle_udp udp "$conf_file"
 	config_foreach handle_http http "$conf_file"
 	config_foreach handle_https https "$conf_file"
 	config_foreach handle_socks5 socks5 "$conf_file"
