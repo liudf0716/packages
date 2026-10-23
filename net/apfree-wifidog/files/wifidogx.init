@@ -15,6 +15,7 @@ handle_gateway() {
 	local gateway_auth_enabled
 
 	config_get gateway_name "$section" gateway_name
+	[ -z "$gateway_name" ] && config_get gateway_name "$section" gateway_interface
 	config_get gateway_channel "$section" gateway_channel
 	config_get gateway_id "$section" gateway_id
 	config_get gateway_auth_enabled "$section" gateway_auth_enabled 1
