@@ -254,7 +254,7 @@ prepare_wifidog_conf() {
 		'privileged_ops_secret:string:chawrt@2026' \
 		'ttl_values:string:64,128' \
 		'anti_nat_permit_macs:string' \
-		'disable_portal_auth:bool:1' \
+		'disable_portal_auth:bool:0' \
 		'ap_device_id:string' \
 		'ap_mac_address:string' \
 		'ap_longitude:string' \
