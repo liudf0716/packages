@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=xdns-bpf
-PKG_VERSION:=0.09.12
+PKG_VERSION:=0.10.23
 PKG_RELEASE:=1
 
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=d1dda082b57c330cf16f9027edfe8686de3dc58ea13fee4a33faafaeaa2429fc
+PKG_HASH:=e08e11a98f21e77bf8c71a032ef3a050ee0055a7948643a365b4a25e1d581588
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
