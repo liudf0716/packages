@@ -8,12 +8,13 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=xkcptun
-PKG_VERSION:=1.10.567
 PKG_RELEASE:=1
 
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/xkcptun/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=315030cfa319c68ca9c568907fcad277f29829e804f8089929ba1ea4d8817c26
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/liudf0716/xkcptun.git
+PKG_SOURCE_DATE:=2026-10-25
+PKG_SOURCE_VERSION:=e5ec5ed74a20a75e9c3b22221d7f07346ffa0d1e
+PKG_MIRROR_HASH:=babd55383b6a5f7b6dbef7364cbf16a0afd584afd1bb20703a15f6261e552550
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
