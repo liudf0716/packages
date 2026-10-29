@@ -8,19 +8,21 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aw-bpf
-PKG_VERSION:=2.10.86
 PKG_RELEASE:=1
 
-PKG_SOURCE:=aw-bpf-$(PKG_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/liudf0716/$(PKG_NAME)/tar.gz/$(PKG_VERSION)?
-PKG_HASH:=e1939409a3463e1acad193e73a8e28e6f4afe579ddb0ac28ad56f1aa9598273c
-PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_DATE:=2026-10-13
+PKG_SOURCE_VERSION:=8d15be0865a23c8d33ca0740acaa0aac60e04282
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-2.0-or-later
 PKG_LICENSE_FILES:=LICENSE
 
 PKG_BUILD_DEPENDS:=bpf-headers
+
+ifneq ($(wildcard $(CURDIR)/git-src),)
+  USE_GIT_TREE:=1
+endif
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
@@ -52,10 +54,7 @@ define KernelPackage/xdpi
   AUTOLOAD:=$(call AutoProbe,xdpi_bpf)
 endef
 
-define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) /media/windows/github/wifidogx/aw-bpf/* $(PKG_BUILD_DIR)/
-endef
+
 
 
 # Build cmake userspace first (aw-bpfctl, aw-eventd), then BPF objects and kmod.
