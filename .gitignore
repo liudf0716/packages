@@ -9,3 +9,5 @@
 /*.patch
 .github/copilot-instructions.md
 net/xfrpc/skills/
+git-src
+**/git-src
