@@ -12,9 +12,9 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/liudf0716/apfree-wifidog.git
-PKG_SOURCE_DATE:=2026-10-25
-PKG_SOURCE_VERSION:=4075182ffedaf19b36926dc2f068fe413901aba3
-PKG_MIRROR_HASH:=8d39da0f8dd70ad204fbcd7d2f16c44fd51d4678a80884403d2b3983543e0b20
+PKG_SOURCE_DATE:=2026-11-03
+PKG_SOURCE_VERSION:=f012073104f2a1aa75954b5bc0e013b14bf663d4
+PKG_MIRROR_HASH:=70ec5a27d32f1d1d87738d0a26fe606d84760ef5f944acbd1ae2cebfb7f6a874
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-3.0-or-later
@@ -51,7 +51,6 @@ define Package/apfree-wifidog/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/wdctlx $(1)/usr/bin/wdctlx
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_DIR) $(1)/etc
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wifidog-msg.html $(1)/etc/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wifidog-redir.html $(1)/etc/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wifidog-redir.html.front $(1)/etc/
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/wifidog-redir.html.rear $(1)/etc/
