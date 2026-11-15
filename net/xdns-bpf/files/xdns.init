@@ -17,6 +17,7 @@ load_config() {
 	config_get xkcp_dns global xkcp_dns "127.0.0.1:5353"
 	config_get xkcp_tcp global xkcp_tcp "192.168.8.1:12345"
 	config_get proxy_domains_file global proxy_domains_file "/etc/xdns/proxy_domains.txt"
+	config_get static_ips_file global static_ips_file "/etc/xdns/static_ips.txt"
 }
 
 start_service() {
@@ -53,6 +54,11 @@ start_service() {
 	# Load proxy domains
 	if [ -f "$proxy_domains_file" ]; then
 		$CTL load-domains "$proxy_domains_file"
+	fi
+
+	# Load static redirect IPs
+	if [ -f "$static_ips_file" ]; then
+		$CTL load-ips "$static_ips_file"
 	fi
 
 	echo "xdns-bpf started on $ifname (pipeline ingress pref 5, egress pref 10)"

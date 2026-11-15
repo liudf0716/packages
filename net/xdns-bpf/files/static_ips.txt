@@ -1,0 +1,4 @@
+# Static IPv4 addresses for transparent redirection (one per line)
+# Lines starting with # are comments.
+# e.g.:
+# 1.1.1.1

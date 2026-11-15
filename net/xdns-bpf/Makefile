@@ -12,9 +12,9 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/liudf0716/xdns-bpf.git
-PKG_SOURCE_DATE:=2026-11-01
-PKG_SOURCE_VERSION:=66ffb1584e43077a0920e4e9c4d12041586da5ed
-PKG_MIRROR_HASH:=7bf92a2b1fe3be76a4943fa63698668abdfe93e272d4601e9514ce14a42fc390
+PKG_SOURCE_DATE:=2026-11-15
+PKG_SOURCE_VERSION:=d87ab53489e81e06613189ce8fc7b32a415a75eb
+PKG_MIRROR_HASH:=e6ff774724c06e46cf6b7c718c6e63ac7e4d2ca5fb937db687f1379d2a6a81af
 
 PKG_MAINTAINER:=Dengfeng Liu <liudf0716@gmail.com>
 PKG_LICENSE:=GPL-2.0-or-later
@@ -43,6 +43,7 @@ endef
 define Package/xdns-bpf/conffiles
 /etc/config/xdns
 /etc/xdns/proxy_domains.txt
+/etc/xdns/static_ips.txt
 endef
 
 define Build/Compile
@@ -65,6 +66,7 @@ define Package/xdns-bpf/install
 
 	$(INSTALL_DIR) $(1)/etc/xdns
 	$(INSTALL_DATA) ./files/proxy_domains.txt $(1)/etc/xdns/proxy_domains.txt
+	$(INSTALL_DATA) ./files/static_ips.txt $(1)/etc/xdns/static_ips.txt
 endef
 
 $(eval $(call BuildPackage,xdns-bpf))
